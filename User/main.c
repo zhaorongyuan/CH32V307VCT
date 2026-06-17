@@ -10,14 +10,6 @@
 * microcontroller manufactured by Nanjing Qinheng Microelectronics.
 *******************************************************************************/
 
-/*
- *@Note
- USART Print debugging routine:
- USART1_Tx(PA9).
- This example demonstrates using USART1(PA9) as a print debug port output.
-
-*/
-
 #include "debug.h"
 #include "ch32v30x_conf.h"
 
@@ -30,7 +22,10 @@
 /* Global Variable */
 u8 TxBuffer[] = " ";
 u8 RxBuffer[RXBUF_SIZE]={0};                                         
+uint16_t rxBufferReadPos = 0;       //接收缓冲区读指针
 
+// 提取公共缓冲区，避免栈溢出风险
+static char uart_temp_buf[256] = {0};
 
 /*********************************************************************
  * @fn      LED_Init
@@ -88,7 +83,6 @@ void WIFI8266_Init()
     USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
     USART_InitStructure.USART_Mode = USART_Mode_Tx | USART_Mode_Rx;
 
-
 	GPIO_WriteBit(GPIOC, GPIO_Pin_0, Bit_RESET);
 	GPIO_WriteBit(GPIOC, GPIO_Pin_1, Bit_RESET);
 	
@@ -100,7 +94,7 @@ void WIFI8266_Init()
 }
 
 /*********************************************************************
- * @fn      DMA_Init
+ * @fn      DMA2__Init
  *
  * @brief   Configures the DMA.
  *
@@ -135,6 +129,132 @@ void WIFI8266_Init()
 
  }
 
+/*********************************************************************
+ * @fn      uartWriteWiFi
+ *
+ * @brief   向 WiFi 模组发送数据 (非阻塞)
+ *
+ * @param   data - 要发送的数据的首地址
+ *          num  - 数据长度
+ *
+ * @return  RESET - UART6 busy,failed to send
+ *          SET   - send success
+ */
+FlagStatus uartWriteWiFi(char * data , uint16_t num)
+{
+    //如上次发送未完成，返回
+	if(DMA_GetCurrDataCounter(DMA2_Channel6) != 0){
+		return RESET;
+	}
+
+    DMA_ClearFlag(DMA2_FLAG_TC8);
+	DMA_Cmd(DMA2_Channel6, DISABLE);           // 关 DMA 后操作
+	DMA2_Channel6->MADDR = (uint32_t)data;      // 发送缓冲区为 data
+	DMA_SetCurrDataCounter(DMA2_Channel6, num);  // 设置缓冲区长度
+	DMA_Cmd(DMA2_Channel6, ENABLE);             // 开 DMA
+	return SET;
+}
+
+/*********************************************************************
+ * @fn      uartWriteWiFiStr
+ *
+ * @brief   向 WiFi 模组发送字符串
+ *
+ * @param   str - string to send
+ *
+ * @return  RESET - UART busy,failed to send
+ *          SET   - send success
+ */
+FlagStatus uartWriteWiFiStr(char * str)
+{
+    uint16_t num = 0;
+    while(str[num])num++;           // 计算字符串长度
+    return uartWriteWiFi(str, num);
+}
+
+/*********************************************************************
+ * @fn      uartReadWiFi
+ *
+ * @brief   从接收缓冲区读出一组数据
+ *
+ * @param   buffer - 用来存放读出数据的地址
+ *          num    - 要读的字节数
+ *
+ * @return  uint32_t - 返回实际读出的字节数
+ */
+uint32_t uartReadWiFi(char * buffer , uint16_t num)
+{
+    uint16_t rxBufferEnd = RXBUF_SIZE - DMA_GetCurrDataCounter(DMA2_Channel7); //计算 DMA 数据尾的位置
+    uint16_t i = 0;
+    if (rxBufferReadPos == rxBufferEnd){
+		// 无数据，返回
+        return 0;
+    }
+
+    while (rxBufferReadPos!=rxBufferEnd && i < num){
+        buffer[i] = RxBuffer[rxBufferReadPos];
+        i++;
+        rxBufferReadPos++;
+        if(rxBufferReadPos >= RXBUF_SIZE){
+            // 超出缓冲区，回零
+            rxBufferReadPos = 0;
+        }
+    }
+    return i;
+}
+
+/*********************************************************************
+ * @fn      uartReadByteWiFi
+ *
+ * @brief   从接收缓冲区读出 1 字节数据
+ *
+ * @return  char - 返回读出的数据(无数据也返回0)
+ */
+char uartReadByteWiFi(void)
+{
+    char ret;
+    uint16_t rxBufferEnd = RXBUF_SIZE - DMA_GetCurrDataCounter(DMA2_Channel7);
+    if (rxBufferReadPos == rxBufferEnd){
+        // 无数据，返回
+        return 0;
+    }
+    ret = RxBuffer[rxBufferReadPos];
+    rxBufferReadPos++;
+    if(rxBufferReadPos >= RXBUF_SIZE){
+        // 超出缓冲区，回零
+        rxBufferReadPos = 0;
+    }
+    return ret;
+}
+
+/*********************************************************************
+ * @fn      uartAvailableWiFi
+ *
+ * @brief   获取缓冲区中可读数据的数量
+ *
+ * @return  uint16_t - 返回可读数据数量
+ */
+uint16_t uartAvailableWiFi(void)
+{
+    uint16_t rxBufferEnd = RXBUF_SIZE - DMA_GetCurrDataCounter(DMA2_Channel7);//计算 DMA 数据尾的位置
+    // 计算可读字节
+    if (rxBufferReadPos <= rxBufferEnd){
+        return rxBufferEnd - rxBufferReadPos;
+    }else{
+        return rxBufferEnd +RXBUF_SIZE -rxBufferReadPos;
+    }
+}
+
+// 辅助函数：清空环形接收缓冲区内积累的垃圾数据
+void uartFlushWiFi(void)
+{
+    uint16_t num = uartAvailableWiFi();
+    if(num > 0) {
+        char dump[512];
+        uint16_t read_len = (num > 512) ? 512 : num;
+        uartReadWiFi(dump, read_len);
+    }
+}
 
 /*********************************************************************
  * @fn      main
@@ -145,28 +265,158 @@ void WIFI8266_Init()
  */
 int main(void)
 {
+	int num = 0; // 用于接收可读字节数
+
 	NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
 	SystemCoreClockUpdate();
 	Delay_Init();
 	USART_Printf_Init(115200);	
 	printf("SystemClk:%d\r\n",SystemCoreClock);
-	printf( "ChipID:%08x\r\n", DBGMCU_GetCHIPID() );
+	printf("ChipID:%08x\r\n", DBGMCU_GetCHIPID());
 	printf("This is printf example\r\n");
+	printf("8266 WiFi TEST\r\n");
 
 	LED_Init();
+	DMA2__Init();    // 调用你的 DMA 初始化
+	WIFI8266_Init(); // 调用你的 UART6 串口初始化
+	
+	// 非常重要：开启 UART6 的 DMA 收发请求
+	USART_DMACmd(UART6, USART_DMAReq_Tx | USART_DMAReq_Rx, ENABLE);
 
+    Delay_Ms(1000);
+    
+    /* --------------------------------------------------------
+     * ? 优化点 1：上电首先对模块进行复位，清空所有残留连接和模式
+     * -------------------------------------------------------- */
+    printf("1. 正在复位 WiFi 模块...\r\n");
+    while(uartWriteWiFiStr("AT+RST\r\n")==RESET);
+    Delay_Ms(3000); // 给足 3 秒启动时间
+    uartFlushWiFi(); // 清除复位输出的启动信息，避免干扰后续解析
 
+    // 查询 WiFi 模块是否正常工作
+    while(uartWriteWiFiStr("AT\r\n")==RESET);
+    Delay_Ms(300);
+    
+    // 查询 WiFi 模块版本信息
+    while(uartWriteWiFiStr("AT+GMR\r\n")==RESET);
+    Delay_Ms(300);
+    
+    // 设为 Station 模式
+    while(uartWriteWiFiStr("AT+CWMODE=1\r\n")==RESET);
+    Delay_Ms(300);
+    
+    uartFlushWiFi(); // 清除上面的回应积压
+
+    /* --------------------------------------------------------
+     * ? 优化点 2：Wi-Fi 连接逻辑优化
+     * -------------------------------------------------------- */
+    printf("2. 开始连接 Wi-Fi 热点...\r\n");
+    while(uartWriteWiFiStr("AT+CWJAP=\"HONOR V30\",\"12345678\"\r\n")==RESET);
+    
+    // 循环阻塞，等待模块开始返回数据（说明握手开始）
+    while(uartAvailableWiFi() == 0);
+    Delay_Ms(5000); // 握手和分配IP需要 5 秒时间
+
+    num = uartAvailableWiFi();
+    if (num > 0 ){
+        uint16_t len = (num > sizeof(uart_temp_buf)-1) ? sizeof(uart_temp_buf)-1 : num;
+        uartReadWiFi(uart_temp_buf, len);
+        uart_temp_buf[len] = '\0';
+        printf("Received Wi-Fi status:\r\n%s", uart_temp_buf);
+    }
+    Delay_Ms(1000);
+
+    /* --------------------------------------------------------
+     * ? 优化点 3：在建立 TCP 前，必须查询 IP（确保拿到非0.0.0.0的IP） [2]
+     * -------------------------------------------------------- */
+    printf("\r\n=================================\r\n");
+    printf("3. 查询分配到的 IP 地址...\r\n");
+    uartFlushWiFi(); 
+    while(uartWriteWiFiStr("AT+CIFSR\r\n")==RESET);
+    Delay_Ms(500);
+    num = uartAvailableWiFi();
+    if(num > 0){ 
+        uint16_t len = (num > sizeof(uart_temp_buf)-1) ? sizeof(uart_temp_buf)-1 : num;
+        uartReadWiFi(uart_temp_buf, len);
+        uart_temp_buf[len] = '\0';
+        printf("%s", uart_temp_buf); 
+    }
+
+    /* --------------------------------------------------------
+     * 4. 尝试连接公网 TCP 服务器
+     * -------------------------------------------------------- */
+    printf("\r\n=================================\r\n");
+    printf("4. 尝试连接 TCP 服务器...\r\n");
+    uartFlushWiFi(); 
+
+    while(uartWriteWiFiStr("AT+CIPSTART=\"TCP\",\"60.205.167.213\",3390\r\n")==RESET);
+    
+    // 监听 3 秒钟，等待 OK 或 CONNECT
+    for(int i=0; i<30; i++){
+        Delay_Ms(100);
+        num = uartAvailableWiFi();
+        if(num > 0){
+            uint16_t len = (num > sizeof(uart_temp_buf)-1) ? sizeof(uart_temp_buf)-1 : num;
+            uartReadWiFi(uart_temp_buf, len);
+            uart_temp_buf[len] = '\0';
+            printf("%s", uart_temp_buf);
+        }
+    }
+
+    /* --------------------------------------------------------
+     * 5. 尝试开启透传模式
+     * -------------------------------------------------------- */
+    printf("\r\n=================================\r\n");
+    printf("5. 尝试开启透传模式...\r\n");
+    uartFlushWiFi(); 
+    while(uartWriteWiFiStr("AT+CIPMODE=1\r\n")==RESET);
+    Delay_Ms(500);
+    num = uartAvailableWiFi();
+    if(num > 0){ 
+        uint16_t len = (num > sizeof(uart_temp_buf)-1) ? sizeof(uart_temp_buf)-1 : num;
+        uartReadWiFi(uart_temp_buf, len);
+        uart_temp_buf[len] = '\0';
+        printf("%s", uart_temp_buf); 
+    }
+
+    /* --------------------------------------------------------
+     * 6. 准备发送数据 (CIPSEND)
+     * -------------------------------------------------------- */
+    printf("\r\n=================================\r\n");
+    printf("6. 准备发送数据 (CIPSEND)...\r\n");
+    uartFlushWiFi(); 
+    while(uartWriteWiFiStr("AT+CIPSEND\r\n")==RESET);
+    Delay_Ms(500);
+    num = uartAvailableWiFi();
+    if(num > 0){ 
+        uint16_t len = (num > sizeof(uart_temp_buf)-1) ? sizeof(uart_temp_buf)-1 : num;
+        uartReadWiFi(uart_temp_buf, len);
+        uart_temp_buf[len] = '\0';
+        printf("%s", uart_temp_buf); 
+    }
+
+    printf("\r\n=================================\r\n");
+    printf("正式进入大循环！\r\n");
+    uartFlushWiFi(); 
+
+    int count = 0;
 	while(1)
     {
-		Delay_Ms(100);
-		GPIO_WriteBit(GPIOE, GPIO_Pin_11, Bit_RESET);
-		Delay_Ms(100);
-		GPIO_WriteBit(GPIOE, GPIO_Pin_11, Bit_SET);
+		Delay_Ms(1000); // 1秒钟发一次
+		
+		// 1. 单片机主动向公网服务器发送数据
+        char sendBuf[64];
+        sprintf(sendBuf, "Hello SSCOM! count = %d\r\n", count++);
+        uartWriteWiFiStr(sendBuf); 
 
+		// 2. 接收服务器发给单片机的数据，并打印到单片机的串口终端
+        int num = uartAvailableWiFi();
+        if (num > 0 ){
+            // 采用公共全局缓冲区，限制单次读取长度，保障内存安全
+            uint16_t len = (num > sizeof(uart_temp_buf)-1) ? sizeof(uart_temp_buf)-1 : num;
+            uartReadWiFi(uart_temp_buf, len);
+            uart_temp_buf[len] = '\0';
+            printf("SSCOM Says: %s", uart_temp_buf); 
+        }
 	}
 }
-
-
-
-
-
