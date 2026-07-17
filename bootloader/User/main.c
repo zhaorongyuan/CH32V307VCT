@@ -311,7 +311,7 @@ int main(void)
      * ? 优化点 2：Wi-Fi 连接逻辑优化
      * -------------------------------------------------------- */
     printf("2. 开始连接 Wi-Fi 热点...\r\n");
-    while(uartWriteWiFiStr("AT+CWJAP=\"HONOR V30\",\"12345678\"\r\n")==RESET);
+    while(uartWriteWiFiStr("AT+CWJAP=\"SZ-P1367\",\"123456789\"\r\n")==RESET);
     
     // 循环阻塞，等待模块开始返回数据（说明握手开始）
     while(uartAvailableWiFi() == 0);

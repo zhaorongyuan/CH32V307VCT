@@ -11,9 +11,14 @@
 			"mcu": "CH32V307VCT6",
 			"description": "Website: http://www.wch.cn/products/CH32V307.html?\\nROM(byte): 256K, SRAM(byte): 64K, CHIP PINS: 100, GPIO PORTS: 80.\\nWCH CH32V3 series of mainstream MCUs covers the needs of a large variety of applications in the industrial,medical and consumer markets. High performance with first-class peripherals and low-power,low-voltage operation is paired with a high level of integration at accessible prices with a simple architecture and easy-to-use tools.",
 			"tempratureScope": "CH32V307VCT6{-40℃~85℃}",
+			"artifactType": "executable",
 			"link": "WCH-Link",
 			"peripheral_version": "3.0",
-			"calibrateSupport": false
+			"calibrateSupport": false,
+			"calibrateCommand": "",
+			"UIConfigSupport": false,
+			"UIConfigCommand": "",
+			"externalFlashSupport": false
 		},
 		"linkedFolders": [],
 		"removedResources": [
@@ -21,6 +26,11 @@
 				"parentLogicPath": "",
 				"type": "file",
 				"name": "*.wvproj"
+			},
+			{
+				"parentLogicPath": "Debug",
+				"type": "folder",
+				"name": "Debug"
 			}
 		],
 		"projectName": "CH32V307VCT",
@@ -103,7 +113,7 @@
 					},
 					"includes": {
 						"include_paths": [
-							"${project}/Startup"
+							"${project}/BSW/Startup"
 						],
 						"include_system_paths": [],
 						"include_files": []
@@ -126,10 +136,18 @@
 					},
 					"includes": {
 						"include_paths": [
+							"${project}/APP",
+							"${project}/BSW/Board",
+							"${project}/BSW/Core",
+							"${project}/BSW/Driver",
+							"${project}/BSW/Peripheral",
+							"${project}/BSW/Services",
+							"${project}/BSW/Startup",
 							"${project}/Debug",
-							"${project}/Core",
+							"${project}/HAL",
+							"${project}/Middleware",
 							"${project}/User",
-							"${project}/Peripheral/inc"
+							"${project}/BSW/Peripheral/inc"
 						],
 						"include_system_paths": [],
 						"include_files": []
@@ -272,6 +290,7 @@
 					"copy_only_section_text": false,
 					"copy_only_section_data": false,
 					"copy_only_sections": [],
+					"create_algorithm_file": false,
 					"other_flags": ""
 				},
 				"createList": {
@@ -334,6 +353,8 @@
 		"disablepowerout": false,
 		"clearcodeflash": false,
 		"disablecodeprotect": false,
+		"flashType": "",
+		"asmFile_path": "",
 		"exepath": "",
 		"exearguments": ""
 	},
@@ -402,7 +423,7 @@
 			"showDebugOutputTimestamps": true
 		},
 		"reserve": {
-			"PROGRAM_NAME": "obj\\CH32V307VCT.elf",
+			"PROGRAM_NAME": "obj/CH32V307VCT.elf",
 			"PROJECT_ATTR": "CH32V307VCT",
 			"PROJECT_BUILD_CONFIG_AUTO_ATTR": true,
 			"PROJECT_BUILD_CONFIG_ID_ATTR": "",
