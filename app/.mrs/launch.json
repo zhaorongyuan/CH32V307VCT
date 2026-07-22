@@ -5,7 +5,7 @@
 			"type": "mrs-debugger",
 			"request": "launch",
 			"name": "CH32V307VCT",
-			"cwd": "d:\\Desktop\\WorkFile\\00_code\\11_opench\\CH32V307\\CH32V307VCT",
+			"cwd": "d:\\Desktop\\WorkFile\\00_code\\11_opench\\CH32V307VCT\\app",
 			"openOCDCfg": {
 				"useLocalOpenOCD": true,
 				"executable": "d:/MounRiver/MounRiver_Studio2/resources/app/resources/win32/components/WCH/OpenOCD/OpenOCD/bin/openocd.exe",
@@ -39,8 +39,8 @@
 					"additionalCommands": []
 				},
 				"loadedFiles": {
-					"executableFile": "d:\\Desktop\\WorkFile\\00_code\\11_opench\\CH32V307\\CH32V307VCT\\obj\\CH32V307VCT.elf",
-					"symbolFile": "d:\\Desktop\\WorkFile\\00_code\\11_opench\\CH32V307\\CH32V307VCT\\obj\\CH32V307VCT.elf",
+					"executableFile": "d:\\Desktop\\WorkFile\\00_code\\11_opench\\CH32V307VCT\\app\\obj\\CH32V307VCT.elf",
+					"symbolFile": "d:\\Desktop\\WorkFile\\00_code\\11_opench\\CH32V307VCT\\app\\obj\\CH32V307VCT.elf",
 					"executableFileOffset": 0,
 					"symbolFileOffset": 0
 				},

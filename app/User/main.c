@@ -5,48 +5,53 @@
  * @date    2026-07-17
  * @version V1.0.0
  *
- * @note    主函数的入口
+ * @note    主函数的入口，修正了多周期任务时间戳重叠及串口拥堵问题
  * @copyright (c) 2026 zry. All rights reserved.
  */
 
-// #include "board_uart_fifo.h"
-// #include "hal_gpio.h"
-// #include "hal_uart.h"
 #include "app_cfg.h"
 #include "debug.h"
 #include "ch32v30x_conf.h"
 
+// #include "board_uart_fifo.h"
+// #include "hal_gpio.h"
+// #include "hal_uart.h"
 // #include "task_control.h"
 // #include "task_ota.h"
 
-/* 全局系统心跳滴答，由 SysTick_Handler 累加 (见 ch32v30x_it.c) */
+/* 全局系统心跳滴答定时器，由 SysTick_Handler 累加 (见 ch32v30x_it.c) */
 volatile uint32_t sys_tick_ms = 0;
 
+/**
+ * @brief  系统核心底层组件初始化
+ */
 static void System_Core_Init(void)
 {
     /* 配置中断优先级分组 */
     NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
-    // /* 更新 SystemCoreClock 变量 */
+    
+    /* 更新 SystemCoreClock 变量 */
     SystemCoreClockUpdate();
-    /* 配置 1ms 的 SysTick 定时器 */
+    
+    /* 配置 1ms 的 SysTick 定时器并开启中断 */
     SysTick_Config(SystemCoreClock / 1000);
     
+    /* 初始化延时组件与调试串口 (115200bps) */
     Delay_Init();
     USART_Printf_Init(115200);
-    printf("SystemClk:%d\r\n",SystemCoreClock);
 
+    printf("\r\n=================================\r\n");
+    printf("System Booting...\r\n");
+    printf("SystemClk: %u Hz\r\n", SystemCoreClock);
     printf("EXTI0 Test\r\n");
-
-
+    printf("=================================\r\n");
 }
 
 int main(void)
 {
-
-
-
-    /* 1. 核心与基础内存组件初始化 */
+    /* 1. 核心与基础硬件组件初始化 */
     System_Core_Init();
+    
     // Board_UartFifo_Init();  /* 必须在 UART 之前初始化 */
 
     // /* 2. 硬件外设初始化 (通过 HAL 接口) */
@@ -55,40 +60,42 @@ int main(void)
     // API_Button_Init();
     // API_Buzzer_Init();
 
-    // API_Uart_Printf(UART_ID_DEBUG, "\r\n=============================\r\n");
-    // API_Uart_Printf(UART_ID_DEBUG, "System Booting... FW: %s\r\n", APP_FW_VERSION);
-    // API_Uart_Printf(UART_ID_DEBUG, "SYS CLK: %u Hz\r\n", SystemCoreClock);
-    // API_Uart_Printf(UART_ID_DEBUG, "=============================\r\n");
-
     // /* 3. 业务任务初始化 */
     // Task_Control_Init();
     // Task_OTA_Init();
 
-    /* 调度器时间戳 */
-    uint32_t last_ctrl_ms = 0;
-    uint32_t last_ota_ms = 0;
+    /* 调度器时间戳：必须解耦，分别为不同的执行周期分配独立的状态寄存器 */
+    uint32_t last_10ms_ticks   = 0;
+    uint32_t last_100ms_ticks  = 0;
+    uint32_t last_1000ms_ticks = 0;
 
     /* 4. 主循环调度 (Super Loop) */
     while (1)
     {
-        /* 高频紧急更新 (1ms 响应级别) */
+        /* 【高频紧急更新区域】 (1ms 响应级别，不要在这一级放耗时程序或裸露 printf) */
         // API_Buzzer_Update();
 
         /* Task Control: 10ms 周期执行 */
-        if ((sys_tick_ms - last_ctrl_ms) >= APP_TASK_10MS_PERIOD) {
-            last_ctrl_ms = sys_tick_ms;
-            // Task_Control_Update();
+        if ((sys_tick_ms - last_10ms_ticks) >= APP_TASK_10MS_PERIOD) {
+            last_10ms_ticks = sys_tick_ms;
+            
+            // Task_Control_Update_10ms();
         }
 
         /* Task Control: 100ms 周期执行 */
-        if ((sys_tick_ms - last_ctrl_ms) >= APP_TASK_100MS_PERIOD) {
-            last_ctrl_ms = sys_tick_ms;
-            // Task_Control_Update();
+        if ((sys_tick_ms - last_100ms_ticks) >= APP_TASK_100MS_PERIOD) {
+            last_100ms_ticks = sys_tick_ms;
+            
+            // Task_Control_Update_100ms();
         }
 
         /* Task OTA: 1000ms 周期执行 */
-        if ((sys_tick_ms - last_ota_ms) >= APP_TASK_1000MS_PERIOD) {
-            last_ota_ms = sys_tick_ms;
+        if ((sys_tick_ms - last_1000ms_ticks) >= APP_TASK_1000MS_PERIOD) {
+            last_1000ms_ticks = sys_tick_ms;
+            
+            /* 将之前的无节制打印限制在 1S 周期，避免波特率物理瓶颈导致系统死等 */
+            printf("SystemClk_1S: %u Hz, RunTime: %u ms\r\n", SystemCoreClock, sys_tick_ms);
+            
             // Task_OTA_Update();
         }
     }
