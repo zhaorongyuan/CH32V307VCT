@@ -12,7 +12,6 @@
 #include "ch32v30x_it.h"
 #include "ch32v30x_gpio.h"
 
-volatile uint32_t Gc_systick_ms = 0;
 
 void NMI_Handler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
 void HardFault_Handler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
@@ -58,7 +57,7 @@ void HardFault_Handler(void)
 void SysTick_Handler(void)
 {
   SysTick->SR = 0; //清除计数标志位
-  Gc_systick_ms++;
+  Gc_SysTick_ms++;
 
 }
 

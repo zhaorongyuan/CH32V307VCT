@@ -148,7 +148,8 @@
 							"${project}/HAL",
 							"${project}/Middleware",
 							"${project}/User",
-							"${project}/BSW/Peripheral/inc"
+							"${project}/BSW/Peripheral/inc",
+							"${project}/Interface"
 						],
 						"include_system_paths": [],
 						"include_files": []

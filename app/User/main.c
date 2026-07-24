@@ -1,26 +1,22 @@
 /**
  * @file    main.c
- * @brief   入口函数
+ * @brief   程序入口
  * @author  zry
  * @date    2026-07-17
  * @version V1.0.0
  *
- * @note    主函数的入口，修正了多周期任务时间戳重叠及串口拥堵问题
+ * @note    主函数的入口
  * @copyright (c) 2026 zry. All rights reserved.
  */
 
+#include "ch32v30x_conf.h"
+#include "Interface.h"
 #include "app_cfg.h"
 #include "debug.h"
-#include "ch32v30x_conf.h"
 
-// #include "board_uart_fifo.h"
-// #include "hal_gpio.h"
-// #include "hal_uart.h"
-// #include "task_control.h"
-// #include "task_ota.h"
 
-/* 1. 声明定义在 ch32v30x_it.c 中的全局系统心跳变量 */
-extern volatile uint32_t Gc_systick_ms;
+
+
 
 
 /**
@@ -71,6 +67,12 @@ static void System_Core_Init(void)
     printf("=================================\r\n");
 }
 
+void delay(volatile unsigned int count) {
+while (count--) {
+// 空循环
+}
+}
+
 int main(void)
 {
     /* 1. 核心与基础硬件组件初始化 */
@@ -99,30 +101,33 @@ int main(void)
     /* 4. 主循环调度 (Super Loop) */
     for(;;)
     {
-        // printf("SystemClk_1S: %u Hz, RunTime: %u ms\r\n", SystemCoreClock, Gc_systick_ms);
-        // API_Buzzer_Update();
+        delay(1000);
 
         /* Task Control: 10ms 周期执行 */
-        if ((Gc_systick_ms - last_10ms_ticks) >= APP_TASK_10MS_PERIOD) {
-            last_10ms_ticks = Gc_systick_ms;
-            
+        if ((Gc_SysTick_ms - last_10ms_ticks) >= APP_TASK_10MS_PERIOD) {
+            last_10ms_ticks = Gc_SysTick_ms;
+
+            // Task_Control_Update_10ms();
         }
 
         /* Task Control: 100ms 周期执行 */
-        if ((Gc_systick_ms - last_100ms_ticks) >= APP_TASK_100MS_PERIOD) {
-            last_100ms_ticks = Gc_systick_ms;
+        if ((Gc_SysTick_ms - last_100ms_ticks) >= APP_TASK_100MS_PERIOD) {
+            last_100ms_ticks = Gc_SysTick_ms;
             
             // Task_Control_Update_100ms();
         }
 
-        /* Task OTA: 1000ms 周期执行 */
-        if ((Gc_systick_ms - last_1000ms_ticks) >= APP_TASK_1000MS_PERIOD) {
-            last_1000ms_ticks = Gc_systick_ms;
+        /* Task Control: 1000ms 周期执行 */
+        if ((Gc_SysTick_ms - last_1000ms_ticks) >= APP_TASK_1000MS_PERIOD) {
+            last_1000ms_ticks = Gc_SysTick_ms;
             
-            /* 将之前的无节制打印限制在 1S 周期，避免波特率物理瓶颈导致系统死等 */
-            // printf("SystemClk_1S: %u Hz, RunTime: %u ms\r\n", SystemCoreClock, Gc_systick_ms);
+            // Task_Control_Update_1000ms();
+
+            // CPU 负载率
+            uint32_t sysstick_cnt = SysTick->CNT;
+            Gs_CpuLoad_tick = ((float)(96000U - sysstick_cnt) / 96000.0f) * 100.0f;
+            printf("Gs_CpuLoad_tick: %u ,\n", (uint32_t)Gs_CpuLoad_tick);
             
-            // Task_OTA_Update();
         }
     }
 }
