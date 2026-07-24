@@ -14,6 +14,8 @@
 
 #include "debug.h"
 
+extern volatile uint32_t Gc_systick_ms;
+
 
 #endif /* __CH32V30x_IT_H */
 

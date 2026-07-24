@@ -19,8 +19,32 @@
 // #include "task_control.h"
 // #include "task_ota.h"
 
-/* 全局系统心跳滴答定时器，由 SysTick_Handler 累加 (见 ch32v30x_it.c) */
-volatile uint32_t sys_tick_ms = 0;
+/* 1. 声明定义在 ch32v30x_it.c 中的全局系统心跳变量 */
+extern volatile uint32_t Gc_systick_ms;
+
+
+/**
+ * @brief  配置 SysTick 定时器 (符合 CH32V30x RISC-V 规范)
+ */
+void SysTick_Config(uint32_t ticks)
+{
+    SysTick->CTLR &= ~(1U << 0);                //关闭 SysTick
+
+    /* 清空计数器与中断标志位 */
+    SysTick->CNT = 0;
+    SysTick->SR = 0;
+
+    SysTick->CMP = ticks - 1;                   //设置计数值器
+
+    SysTick->CTLR |= (1U << 4) | (1U << 3) | (1U << 2);     
+    SysTick->CTLR |= (1U << 5);                 //计数器初始值更新
+    SysTick->CTLR |= (1U << 1);                 //使能计数器中断
+    SysTick->CTLR |= (1U << 0);                 //开启 SysTick
+
+    /* 在 NVIC 中使能 SysTick 的 IRQ 通道 */
+    NVIC_EnableIRQ(SysTick_IRQn);
+
+}
 
 /**
  * @brief  系统核心底层组件初始化
@@ -34,7 +58,7 @@ static void System_Core_Init(void)
     SystemCoreClockUpdate();
     
     /* 配置 1ms 的 SysTick 定时器并开启中断 */
-    SysTick_Config(SystemCoreClock / 1000);
+    SysTick_Config(SystemCoreClock / 1000U);
     
     /* 初始化延时组件与调试串口 (115200bps) */
     Delay_Init();
@@ -64,37 +88,39 @@ int main(void)
     // Task_Control_Init();
     // Task_OTA_Init();
 
+    /* 开启全局中断 */
+    __enable_irq();
+
     /* 调度器时间戳：必须解耦，分别为不同的执行周期分配独立的状态寄存器 */
     uint32_t last_10ms_ticks   = 0;
     uint32_t last_100ms_ticks  = 0;
     uint32_t last_1000ms_ticks = 0;
 
     /* 4. 主循环调度 (Super Loop) */
-    while (1)
+    for(;;)
     {
-        /* 【高频紧急更新区域】 (1ms 响应级别，不要在这一级放耗时程序或裸露 printf) */
+        // printf("SystemClk_1S: %u Hz, RunTime: %u ms\r\n", SystemCoreClock, Gc_systick_ms);
         // API_Buzzer_Update();
 
         /* Task Control: 10ms 周期执行 */
-        if ((sys_tick_ms - last_10ms_ticks) >= APP_TASK_10MS_PERIOD) {
-            last_10ms_ticks = sys_tick_ms;
+        if ((Gc_systick_ms - last_10ms_ticks) >= APP_TASK_10MS_PERIOD) {
+            last_10ms_ticks = Gc_systick_ms;
             
-            // Task_Control_Update_10ms();
         }
 
         /* Task Control: 100ms 周期执行 */
-        if ((sys_tick_ms - last_100ms_ticks) >= APP_TASK_100MS_PERIOD) {
-            last_100ms_ticks = sys_tick_ms;
+        if ((Gc_systick_ms - last_100ms_ticks) >= APP_TASK_100MS_PERIOD) {
+            last_100ms_ticks = Gc_systick_ms;
             
             // Task_Control_Update_100ms();
         }
 
         /* Task OTA: 1000ms 周期执行 */
-        if ((sys_tick_ms - last_1000ms_ticks) >= APP_TASK_1000MS_PERIOD) {
-            last_1000ms_ticks = sys_tick_ms;
+        if ((Gc_systick_ms - last_1000ms_ticks) >= APP_TASK_1000MS_PERIOD) {
+            last_1000ms_ticks = Gc_systick_ms;
             
             /* 将之前的无节制打印限制在 1S 周期，避免波特率物理瓶颈导致系统死等 */
-            printf("SystemClk_1S: %u Hz, RunTime: %u ms\r\n", SystemCoreClock, sys_tick_ms);
+            // printf("SystemClk_1S: %u Hz, RunTime: %u ms\r\n", SystemCoreClock, Gc_systick_ms);
             
             // Task_OTA_Update();
         }

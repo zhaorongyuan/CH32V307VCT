@@ -12,11 +12,11 @@
 #include "ch32v30x_it.h"
 #include "ch32v30x_gpio.h"
 
-/* 声明外部的全局滴答计数变量 */
-extern volatile uint32_t sys_tick_ms;
+volatile uint32_t Gc_systick_ms = 0;
 
 void NMI_Handler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
 void HardFault_Handler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
+void SysTick_Handler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
 
 /*********************************************************************
  * @fn      NMI_Handler
@@ -48,17 +48,20 @@ void HardFault_Handler(void)
   }
 }
 
-/**
- * @brief  SysTick 系统滴答中断服务程序
+/*********************************************************************
+ * @fn      SysTick_Handler
+ *
+ * @brief   This function handles SysTick exception.
+ *
+ * @return  none
  */
-/* 使用 WCH 硬件快速中断特有的免表跳转与硬件压栈属性 */
-__attribute__((interrupt("WCH-Interrupt-fast"))) void SysTick_Handler(void)
+void SysTick_Handler(void)
 {
-    /* 清除 SysTick 比较寄存器状态标志位 */
-    SysTick->SR &= ~(1 << 0);
-    
-    /* 累加时间基准（单位：毫秒） */
-    sys_tick_ms++;
+  SysTick->SR = 0; //清除计数标志位
+  Gc_systick_ms++;
+
 }
+
+
 
 
