@@ -16,26 +16,23 @@
 
 
 
-
-
-
 /**
  * @brief  配置 SysTick 定时器 (符合 CH32V30x RISC-V 规范)
  */
 void SysTick_Config(uint32_t ticks)
 {
-    SysTick->CTLR &= ~(1U << 0);                //关闭 SysTick
+    SysTick->CTLR &= ~(1U << 0);
 
     /* 清空计数器与中断标志位 */
     SysTick->CNT = 0;
     SysTick->SR = 0;
 
-    SysTick->CMP = ticks - 1;                   //设置计数值器
+    SysTick->CMP = ticks - 1;
 
     SysTick->CTLR |= (1U << 4) | (1U << 3) | (1U << 2);     
-    SysTick->CTLR |= (1U << 5);                 //计数器初始值更新
-    SysTick->CTLR |= (1U << 1);                 //使能计数器中断
-    SysTick->CTLR |= (1U << 0);                 //开启 SysTick
+    SysTick->CTLR |= (1U << 5);
+    SysTick->CTLR |= (1U << 1);
+    SysTick->CTLR |= (1U << 0);
 
     /* 在 NVIC 中使能 SysTick 的 IRQ 通道 */
     NVIC_EnableIRQ(SysTick_IRQn);
@@ -59,12 +56,6 @@ static void System_Core_Init(void)
     /* 初始化延时组件与调试串口 (115200bps) */
     Delay_Init();
     USART_Printf_Init(115200);
-
-    printf("\r\n=================================\r\n");
-    printf("System Booting...\r\n");
-    printf("SystemClk: %u Hz\r\n", SystemCoreClock);
-    printf("EXTI0 Test\r\n");
-    printf("=================================\r\n");
 }
 
 void delay(volatile unsigned int count) {
