@@ -11,6 +11,7 @@
 *******************************************************************************/
 #include "ch32v30x_it.h"
 #include "ch32v30x_gpio.h"
+#include "app_global.h"
 
 
 void NMI_Handler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
@@ -56,7 +57,7 @@ void HardFault_Handler(void)
  */
 void SysTick_Handler(void)
 {
-  SysTick->SR = 0; //Çå³ý¼ÆÊý±êÖ¾Î»
+  SysTick->SR = 0; //ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¾Î»
   Gc_SysTick_ms++;
 
 }

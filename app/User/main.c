@@ -1,11 +1,107 @@
 /**
  * @file    main.c
- * @brief   ³ÌÐòÈë¿Ú
+ * @brief   ç¨‹åºå…¥å£ â€” Super Loop è°ƒåº¦å™¨
  * @author  zry
  * @date    2026-07-17
  * @version V1.0.0
  *
- * @note    Ö÷º¯ÊýµÄÈë¿Ú
+ * @note    ä¸»å‡½æ•°å…¥å£ï¼Œè´Ÿè´£ç³»ç»Ÿåˆå§‹åŒ–å’Œå‘¨æœŸè°ƒåº¦
+ * @copyright (c) 2026 zry. All rights reserved.
+ */
+
+#include "ch32v30x_conf.h"
+#include "app_cfg.h"
+#include "app_global.h"
+#include "board.h"
+#include "Interface.h"
+#include "task_control.h"
+#include "task_ota.h"
+
+/**
+ * @brief  ç³»ç»Ÿæ ¸å¿ƒåº•å±‚ç»„ä»¶åˆå§‹åŒ–
+ */
+static void System_Core_Init(void)
+{
+    /* é…ç½®ä¸­æ–­ä¼˜å…ˆçº§åˆ†ç»„ */
+    NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
+
+    /* æ›´æ–° SystemCoreClock å˜é‡ */
+    SystemCoreClockUpdate();
+
+    /* é…ç½® 1ms çš„ SysTick å®šæ—¶å™¨å¹¶å¼€å¯ä¸­æ–­ */
+    SysTick_Config(SystemCoreClock / 1000U);
+
+    /* åˆå§‹åŒ–å»¶æ—¶ç»„ä»¶ä¸Žè°ƒè¯•ä¸²å£ (115200bps) */
+    Delay_Init();
+    USART_Printf_Init(115200);
+}
+
+int main(void)
+{
+    /* 1. æ ¸å¿ƒåˆå§‹åŒ– */
+    System_Core_Init();
+
+    /* 2. æ¿çº§å¤–è®¾åˆå§‹åŒ– (é€šè¿‡ BSW å±‚) */
+    Board_Init();
+
+    /* 3. HAL å¤–è®¾åˆå§‹åŒ– (é€šè¿‡ Interface å±‚) */
+    API_Led_Init();
+    API_Key_Init();
+    API_Buzzer_Init();
+    API_Wifi_Init();
+
+    /* 4. ä¸šåŠ¡ä»»åŠ¡åˆå§‹åŒ– */
+    Task_Control_Init();
+    Task_OTA_Init();
+
+    /* å¼€å¯å…¨å±€ä¸­æ–­ */
+    __enable_irq();
+
+    printf("SystemClk:%d\r\n", SystemCoreClock);
+    printf("ChipID:%08x\r\n", DBGMCU_GetCHIPID());
+    printf("FW: v%d.%d.%d\r\n",
+           APP_FW_VERSION_MAJOR, APP_FW_VERSION_MINOR, APP_FW_VERSION_PATCH);
+
+    /* è°ƒåº¦å™¨æ—¶é—´æˆ³ */
+    uint32_t last_10ms_ticks   = 0;
+    uint32_t last_100ms_ticks  = 0;
+    uint32_t last_1000ms_ticks = 0;
+
+    /* 5. ä¸»å¾ªçŽ¯è°ƒåº¦ (Super Loop) */
+    for (;;)
+    {
+        /* Task Control: 10ms å‘¨æœŸæ‰§è¡Œ */
+        if ((Gc_SysTick_ms - last_10ms_ticks) >= APP_TASK_10MS_PERIOD) {
+            last_10ms_ticks = Gc_SysTick_ms;
+            Task_Control_Update_10ms();
+        }
+
+        /* Task Control: 100ms å‘¨æœŸæ‰§è¡Œ */
+        if ((Gc_SysTick_ms - last_100ms_ticks) >= APP_TASK_100MS_PERIOD) {
+            last_100ms_ticks = Gc_SysTick_ms;
+            Task_Control_Update_100ms();
+        }
+
+        /* Task Control + OTA: 1000ms å‘¨æœŸæ‰§è¡Œ */
+        if ((Gc_SysTick_ms - last_1000ms_ticks) >= APP_TASK_1000MS_PERIOD) {
+            last_1000ms_ticks = Gc_SysTick_ms;
+            Task_Control_Update_1000ms();
+            Task_OTA_Update();
+
+            /* CPU è´Ÿè½½çŽ‡ï¼ˆæ•´æ•°è¿ç®—ï¼Œæ—  FPUï¼‰ */
+            uint32_t systick_cnt = SysTick->CNT;
+            Gs_CpuLoad_percent = (96000U - systick_cnt) * 100U / 96000U;
+        }
+    }
+}
+/**
+ * @file    main.c
+ * @brief   ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+ * @author  zry
+ * @date    2026-07-17
+ * @version V1.0.0
+ *
+ * @note    ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
  * @copyright (c) 2026 zry. All rights reserved.
  */
 
@@ -17,13 +113,13 @@
 
 
 /**
- * @brief  ÅäÖÃ SysTick ¶¨Ê±Æ÷ (·ûºÏ CH32V30x RISC-V ¹æ·¶)
+ * @brief  ï¿½ï¿½ï¿½ï¿½ SysTick ï¿½ï¿½Ê±ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½ CH32V30x RISC-V ï¿½æ·¶)
  */
 void SysTick_Config(uint32_t ticks)
 {
     SysTick->CTLR &= ~(1U << 0);
 
-    /* Çå¿Õ¼ÆÊýÆ÷ÓëÖÐ¶Ï±êÖ¾Î» */
+    /* ï¿½ï¿½Õ¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð¶Ï±ï¿½Ö¾Î» */
     SysTick->CNT = 0;
     SysTick->SR = 0;
 
@@ -34,87 +130,87 @@ void SysTick_Config(uint32_t ticks)
     SysTick->CTLR |= (1U << 1);
     SysTick->CTLR |= (1U << 0);
 
-    /* ÔÚ NVIC ÖÐÊ¹ÄÜ SysTick µÄ IRQ Í¨µÀ */
+    /* ï¿½ï¿½ NVIC ï¿½ï¿½Ê¹ï¿½ï¿½ SysTick ï¿½ï¿½ IRQ Í¨ï¿½ï¿½ */
     NVIC_EnableIRQ(SysTick_IRQn);
 
 }
 
 /**
- * @brief  ÏµÍ³ºËÐÄµ×²ã×é¼þ³õÊ¼»¯
+ * @brief  ÏµÍ³ï¿½ï¿½ï¿½Äµ×²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê¼ï¿½ï¿½
  */
 static void System_Core_Init(void)
 {
-    /* ÅäÖÃÖÐ¶ÏÓÅÏÈ¼¶·Ö×é */
+    /* ï¿½ï¿½ï¿½ï¿½ï¿½Ð¶ï¿½ï¿½ï¿½ï¿½È¼ï¿½ï¿½ï¿½ï¿½ï¿½ */
     NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
     
-    /* ¸üÐÂ SystemCoreClock ±äÁ¿ */
+    /* ï¿½ï¿½ï¿½ï¿½ SystemCoreClock ï¿½ï¿½ï¿½ï¿½ */
     SystemCoreClockUpdate();
     
-    /* ÅäÖÃ 1ms µÄ SysTick ¶¨Ê±Æ÷²¢¿ªÆôÖÐ¶Ï */
+    /* ï¿½ï¿½ï¿½ï¿½ 1ms ï¿½ï¿½ SysTick ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð¶ï¿½ */
     SysTick_Config(SystemCoreClock / 1000U);
     
-    /* ³õÊ¼»¯ÑÓÊ±×é¼þÓëµ÷ÊÔ´®¿Ú (115200bps) */
+    /* ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô´ï¿½ï¿½ï¿½ (115200bps) */
     Delay_Init();
     USART_Printf_Init(115200);
 }
 
 void delay(volatile unsigned int count) {
 while (count--) {
-// ¿ÕÑ­»·
+// ï¿½ï¿½Ñ­ï¿½ï¿½
 }
 }
 
 int main(void)
 {
-    /* 1. ºËÐÄÓë»ù´¡Ó²¼þ×é¼þ³õÊ¼»¯ */
+    /* 1. ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ó²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê¼ï¿½ï¿½ */
     System_Core_Init();
     
-    // Board_UartFifo_Init();  /* ±ØÐëÔÚ UART Ö®Ç°³õÊ¼»¯ */
+    // Board_UartFifo_Init();  /* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ UART Ö®Ç°ï¿½ï¿½Ê¼ï¿½ï¿½ */
 
-    // /* 2. Ó²¼þÍâÉè³õÊ¼»¯ (Í¨¹ý HAL ½Ó¿Ú) */
+    // /* 2. Ó²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê¼ï¿½ï¿½ (Í¨ï¿½ï¿½ HAL ï¿½Ó¿ï¿½) */
     // API_Uart_Init(UART_ID_DEBUG, DBG_UART_BAUD);
     // API_Led_Init();
     // API_Button_Init();
     // API_Buzzer_Init();
 
-    // /* 3. ÒµÎñÈÎÎñ³õÊ¼»¯ */
+    // /* 3. Òµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê¼ï¿½ï¿½ */
     // Task_Control_Init();
     // Task_OTA_Init();
 
-    /* ¿ªÆôÈ«¾ÖÖÐ¶Ï */
+    /* ï¿½ï¿½ï¿½ï¿½È«ï¿½ï¿½ï¿½Ð¶ï¿½ */
     __enable_irq();
 
-    /* µ÷¶ÈÆ÷Ê±¼ä´Á£º±ØÐë½âñî£¬·Ö±ðÎª²»Í¬µÄÖ´ÐÐÖÜÆÚ·ÖÅä¶ÀÁ¢µÄ×´Ì¬¼Ä´æÆ÷ */
+    /* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½î£¬ï¿½Ö±ï¿½Îªï¿½ï¿½Í¬ï¿½ï¿½Ö´ï¿½ï¿½ï¿½ï¿½ï¿½Ú·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×´Ì¬ï¿½Ä´ï¿½ï¿½ï¿½ */
     uint32_t last_10ms_ticks   = 0;
     uint32_t last_100ms_ticks  = 0;
     uint32_t last_1000ms_ticks = 0;
 
-    /* 4. Ö÷Ñ­»·µ÷¶È (Super Loop) */
+    /* 4. ï¿½ï¿½Ñ­ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ (Super Loop) */
     for(;;)
     {
         delay(1000);
 
-        /* Task Control: 10ms ÖÜÆÚÖ´ÐÐ */
+        /* Task Control: 10ms ï¿½ï¿½ï¿½ï¿½Ö´ï¿½ï¿½ */
         if ((Gc_SysTick_ms - last_10ms_ticks) >= APP_TASK_10MS_PERIOD) {
             last_10ms_ticks = Gc_SysTick_ms;
 
             // Task_Control_Update_10ms();
         }
 
-        /* Task Control: 100ms ÖÜÆÚÖ´ÐÐ */
+        /* Task Control: 100ms ï¿½ï¿½ï¿½ï¿½Ö´ï¿½ï¿½ */
         if ((Gc_SysTick_ms - last_100ms_ticks) >= APP_TASK_100MS_PERIOD) {
             last_100ms_ticks = Gc_SysTick_ms;
             
             // Task_Control_Update_100ms();
         }
 
-        /* Task Control: 1000ms ÖÜÆÚÖ´ÐÐ */
+        /* Task Control: 1000ms ï¿½ï¿½ï¿½ï¿½Ö´ï¿½ï¿½ */
         if ((Gc_SysTick_ms - last_1000ms_ticks) >= APP_TASK_1000MS_PERIOD) {
             last_1000ms_ticks = Gc_SysTick_ms;
             
             // Task_Control_Update_1000ms();
 
-            // CPU ¸ºÔØÂÊ
+            // CPU ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
             uint32_t sysstick_cnt = SysTick->CNT;
             Gs_CpuLoad_tick = ((float)(96000U - sysstick_cnt) / 96000.0f) * 100.0f;
             printf("Gs_CpuLoad_tick: %u ,\n", (uint32_t)Gs_CpuLoad_tick);
@@ -135,9 +231,9 @@ int main(void)
 // /* Global Variable */
 // u8 TxBuffer[] = " ";
 // u8 RxBuffer[RXBUF_SIZE]={0};                                         
-// uint16_t rxBufferReadPos = 0;       //½ÓÊÕ»º³åÇø¶ÁÖ¸Õë
+// uint16_t rxBufferReadPos = 0;       //ï¿½ï¿½ï¿½Õ»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½
 
-// // ÌáÈ¡¹«¹²»º³åÇø£¬±ÜÃâÕ»Òç³ö·çÏÕ
+// // ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Õ»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 // static char uart_temp_buf[256] = {0};
 
 // /*********************************************************************
@@ -165,8 +261,8 @@ int main(void)
 // /*********************************************************************
 //  * @fn      WIFI8266_Init
 //  *
-//  * @brief   PC0 - UART6_TX - ESP8266_RX <¼æÈÝ ESP-01£¬ESP-01S WiFi Ä£¿é>
-//  *			PC1 - UART6_RX - ESP8266_TX <Ê¹ÓÃÊ±×¢Òâ WiFi ÌìÏß³¯Ïò°åÍâ>
+//  * @brief   PC0 - UART6_TX - ESP8266_RX <ï¿½ï¿½ï¿½ï¿½ ESP-01ï¿½ï¿½ESP-01S WiFi Ä£ï¿½ï¿½>
+//  *			PC1 - UART6_RX - ESP8266_TX <Ê¹ï¿½ï¿½Ê±×¢ï¿½ï¿½ WiFi ï¿½ï¿½ï¿½ß³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½>
 //  *
 //  * @return  none
 //  */
@@ -184,7 +280,7 @@ int main(void)
 // 	GPIO_Init(GPIOC, &GPIO_InitStructure);
 
 // 	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_1;
-// 	//RX£¬ÊäÈëÉÏÀ­
+// 	//RXï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 // 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
 // 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
 // 	GPIO_Init(GPIOC, &GPIO_InitStructure);
@@ -200,7 +296,7 @@ int main(void)
 // 	GPIO_WriteBit(GPIOC, GPIO_Pin_1, Bit_RESET);
 	
 // 	USART_Init(UART6, &USART_InitStructure);
-// 	//¿ªÆô½ÓÊÕ DMA
+// 	//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ DMA
 // 	DMA_Cmd(DMA2_Channel7, ENABLE);
 //     USART_Cmd(UART6, ENABLE);
 
@@ -218,26 +314,26 @@ int main(void)
 // 	DMA_InitTypeDef DMA_InitStructure ={0};
 // 	RCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA2, ENABLE);
 
-// 	// TX DMA ³õÊ¼»¯
+// 	// TX DMA ï¿½ï¿½Ê¼ï¿½ï¿½
 // 	DMA_DeInit(DMA2_Channel6);
-// 	DMA_InitStructure.DMA_PeripheralBaseAddr = (u32)(&UART6->DATAR);        // DMA ÍâÉè»ùÖ·£¬ÐèÖ¸Ïò¶ÔÓ¦µÄÍâÉè
-// 	DMA_InitStructure.DMA_MemoryBaseAddr = (u32)TxBuffer;                   // DMA ÄÚ´æ»ùÖ·£¬Ö¸Ïò·¢ËÍ»º³åÇøµÄÊ×µØÖ·
-// 	DMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralDST;                      // ·½Ïò : ÍâÉè ×÷Îª ÖÕµã£¬¼´ ÄÚ´æ ->  ÍâÉè
-// 	DMA_InitStructure.DMA_BufferSize = 0;                                   // »º³åÇø´óÐ¡,¼´ÒªDMA·¢ËÍµÄÊý¾Ý³¤¶È,Ä¿Ç°Ã»ÓÐÊý¾Ý¿É·¢
-// 	DMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable;        // ÍâÉèµØÖ·×ÔÔö£¬½ûÓÃ
-// 	DMA_InitStructure.DMA_MemoryInc = DMA_MemoryInc_Enable;                 // ÄÚ´æµØÖ·×ÔÔö£¬ÆôÓÃ
-// 	DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Byte; // ÍâÉèÊý¾ÝÎ»¿í£¬8Î»(Byte)
-//  	DMA_InitStructure.DMA_MemoryDataSize = DMA_MemoryDataSize_Byte;         // ÄÚ´æÊý¾ÝÎ»¿í£¬8Î»(Byte)
-// 	DMA_InitStructure.DMA_Mode = DMA_Mode_Normal;                           // ÆÕÍ¨Ä£Ê½£¬·¢Íê½áÊø£¬²»Ñ­»··¢ËÍ
-// 	DMA_InitStructure.DMA_Priority = DMA_Priority_VeryHigh;                 // ÓÅÏÈ¼¶×î¸ß
-// 	DMA_InitStructure.DMA_M2M = DMA_M2M_Disable;                            // M2P,½ûÓÃM2M
+// 	DMA_InitStructure.DMA_PeripheralBaseAddr = (u32)(&UART6->DATAR);        // DMA ï¿½ï¿½ï¿½ï¿½ï¿½Ö·ï¿½ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½ï¿½Ó¦ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+// 	DMA_InitStructure.DMA_MemoryBaseAddr = (u32)TxBuffer;                   // DMA ï¿½Ú´ï¿½ï¿½Ö·ï¿½ï¿½Ö¸ï¿½ï¿½ï¿½Í»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×µï¿½Ö·
+// 	DMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralDST;                      // ï¿½ï¿½ï¿½ï¿½ : ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Îª ï¿½Õµã£¬ï¿½ï¿½ ï¿½Ú´ï¿½ ->  ï¿½ï¿½ï¿½ï¿½
+// 	DMA_InitStructure.DMA_BufferSize = 0;                                   // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð¡,ï¿½ï¿½ÒªDMAï¿½ï¿½ï¿½Íµï¿½ï¿½ï¿½ï¿½Ý³ï¿½ï¿½ï¿½,Ä¿Ç°Ã»ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿É·ï¿½
+// 	DMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable;        // ï¿½ï¿½ï¿½ï¿½ï¿½Ö·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+// 	DMA_InitStructure.DMA_MemoryInc = DMA_MemoryInc_Enable;                 // ï¿½Ú´ï¿½ï¿½Ö·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+// 	DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Byte; // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Î»ï¿½ï¿½ï¿½ï¿½8Î»(Byte)
+//  	DMA_InitStructure.DMA_MemoryDataSize = DMA_MemoryDataSize_Byte;         // ï¿½Ú´ï¿½ï¿½ï¿½ï¿½ï¿½Î»ï¿½ï¿½ï¿½ï¿½8Î»(Byte)
+// 	DMA_InitStructure.DMA_Mode = DMA_Mode_Normal;                           // ï¿½ï¿½Í¨Ä£Ê½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ñ­ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+// 	DMA_InitStructure.DMA_Priority = DMA_Priority_VeryHigh;                 // ï¿½ï¿½ï¿½È¼ï¿½ï¿½ï¿½ï¿½
+// 	DMA_InitStructure.DMA_M2M = DMA_M2M_Disable;                            // M2P,ï¿½ï¿½ï¿½ï¿½M2M
 // 	DMA_Init(DMA2_Channel6, &DMA_InitStructure);
 
-// 	// RX DMA ³õÊ¼»¯£¬»·ÐÎ»º³åÇø×Ô¶¯½ÓÊÕ
-// 	DMA_InitStructure.DMA_MemoryBaseAddr = (u32)RxBuffer;                   // ½ÓÊÕ»º³åÇø
-// 	DMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralSRC;                      // ·½Ïò : ÍâÉè ×÷Îª Ô´£¬¼´ ÄÚ´æ <- ÍâÉè
-// 	DMA_InitStructure.DMA_BufferSize = RXBUF_SIZE;                          // »º³åÇø³¤¶ÈÎª RXBUF_SIZE
-// 	DMA_InitStructure.DMA_Mode = DMA_Mode_Circular;                         // Ñ­»·Ä£Ê½£¬¹¹³É»·ÐÎ»º³åÇø
+// 	// RX DMA ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Î»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô¶ï¿½ï¿½ï¿½ï¿½ï¿½
+// 	DMA_InitStructure.DMA_MemoryBaseAddr = (u32)RxBuffer;                   // ï¿½ï¿½ï¿½Õ»ï¿½ï¿½ï¿½ï¿½ï¿½
+// 	DMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralSRC;                      // ï¿½ï¿½ï¿½ï¿½ : ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Îª Ô´ï¿½ï¿½ï¿½ï¿½ ï¿½Ú´ï¿½ <- ï¿½ï¿½ï¿½ï¿½
+// 	DMA_InitStructure.DMA_BufferSize = RXBUF_SIZE;                          // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Îª RXBUF_SIZE
+// 	DMA_InitStructure.DMA_Mode = DMA_Mode_Circular;                         // Ñ­ï¿½ï¿½Ä£Ê½ï¿½ï¿½ï¿½ï¿½ï¿½É»ï¿½ï¿½Î»ï¿½ï¿½ï¿½ï¿½ï¿½
 // 	DMA_Init(DMA2_Channel7, &DMA_InitStructure);
 
 //  }
@@ -245,33 +341,33 @@ int main(void)
 // /*********************************************************************
 //  * @fn      uartWriteWiFi
 //  *
-//  * @brief   Ïò WiFi Ä£×é·¢ËÍÊý¾Ý (·Ç×èÈû)
+//  * @brief   ï¿½ï¿½ WiFi Ä£ï¿½é·¢ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½)
 //  *
-//  * @param   data - Òª·¢ËÍµÄÊý¾ÝµÄÊ×µØÖ·
-//  *          num  - Êý¾Ý³¤¶È
+//  * @param   data - Òªï¿½ï¿½ï¿½Íµï¿½ï¿½ï¿½ï¿½Ýµï¿½ï¿½×µï¿½Ö·
+//  *          num  - ï¿½ï¿½ï¿½Ý³ï¿½ï¿½ï¿½
 //  *
 //  * @return  RESET - UART6 busy,failed to send
 //  *          SET   - send success
 //  */
 // FlagStatus uartWriteWiFi(char * data , uint16_t num)
 // {
-//     //ÈçÉÏ´Î·¢ËÍÎ´Íê³É£¬·µ»Ø
+//     //ï¿½ï¿½ï¿½Ï´Î·ï¿½ï¿½ï¿½Î´ï¿½ï¿½É£ï¿½ï¿½ï¿½ï¿½ï¿½
 // 	if(DMA_GetCurrDataCounter(DMA2_Channel6) != 0){
 // 		return RESET;
 // 	}
 
 //     DMA_ClearFlag(DMA2_FLAG_TC8);
-// 	DMA_Cmd(DMA2_Channel6, DISABLE);           // ¹Ø DMA ºó²Ù×÷
-// 	DMA2_Channel6->MADDR = (uint32_t)data;      // ·¢ËÍ»º³åÇøÎª data
-// 	DMA_SetCurrDataCounter(DMA2_Channel6, num);  // ÉèÖÃ»º³åÇø³¤¶È
-// 	DMA_Cmd(DMA2_Channel6, ENABLE);             // ¿ª DMA
+// 	DMA_Cmd(DMA2_Channel6, DISABLE);           // ï¿½ï¿½ DMA ï¿½ï¿½ï¿½ï¿½ï¿½
+// 	DMA2_Channel6->MADDR = (uint32_t)data;      // ï¿½ï¿½ï¿½Í»ï¿½ï¿½ï¿½ï¿½ï¿½Îª data
+// 	DMA_SetCurrDataCounter(DMA2_Channel6, num);  // ï¿½ï¿½ï¿½Ã»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+// 	DMA_Cmd(DMA2_Channel6, ENABLE);             // ï¿½ï¿½ DMA
 // 	return SET;
 // }
 
 // /*********************************************************************
 //  * @fn      uartWriteWiFiStr
 //  *
-//  * @brief   Ïò WiFi Ä£×é·¢ËÍ×Ö·û´®
+//  * @brief   ï¿½ï¿½ WiFi Ä£ï¿½é·¢ï¿½ï¿½ï¿½Ö·ï¿½ï¿½ï¿½
 //  *
 //  * @param   str - string to send
 //  *
@@ -281,26 +377,26 @@ int main(void)
 // FlagStatus uartWriteWiFiStr(char * str)
 // {
 //     uint16_t num = 0;
-//     while(str[num])num++;           // ¼ÆËã×Ö·û´®³¤¶È
+//     while(str[num])num++;           // ï¿½ï¿½ï¿½ï¿½ï¿½Ö·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 //     return uartWriteWiFi(str, num);
 // }
 
 // /*********************************************************************
 //  * @fn      uartReadWiFi
 //  *
-//  * @brief   ´Ó½ÓÊÕ»º³åÇø¶Á³öÒ»×éÊý¾Ý
+//  * @brief   ï¿½Ó½ï¿½ï¿½Õ»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 //  *
-//  * @param   buffer - ÓÃÀ´´æ·Å¶Á³öÊý¾ÝµÄµØÖ·
-//  *          num    - Òª¶ÁµÄ×Ö½ÚÊý
+//  * @param   buffer - ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Å¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ÝµÄµï¿½Ö·
+//  *          num    - Òªï¿½ï¿½ï¿½ï¿½ï¿½Ö½ï¿½ï¿½ï¿½
 //  *
-//  * @return  uint32_t - ·µ»ØÊµ¼Ê¶Á³öµÄ×Ö½ÚÊý
+//  * @return  uint32_t - ï¿½ï¿½ï¿½ï¿½Êµï¿½Ê¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö½ï¿½ï¿½ï¿½
 //  */
 // uint32_t uartReadWiFi(char * buffer , uint16_t num)
 // {
-//     uint16_t rxBufferEnd = RXBUF_SIZE - DMA_GetCurrDataCounter(DMA2_Channel7); //¼ÆËã DMA Êý¾ÝÎ²µÄÎ»ÖÃ
+//     uint16_t rxBufferEnd = RXBUF_SIZE - DMA_GetCurrDataCounter(DMA2_Channel7); //ï¿½ï¿½ï¿½ï¿½ DMA ï¿½ï¿½ï¿½ï¿½Î²ï¿½ï¿½Î»ï¿½ï¿½
 //     uint16_t i = 0;
 //     if (rxBufferReadPos == rxBufferEnd){
-// 		// ÎÞÊý¾Ý£¬·µ»Ø
+// 		// ï¿½ï¿½ï¿½ï¿½ï¿½Ý£ï¿½ï¿½ï¿½ï¿½ï¿½
 //         return 0;
 //     }
 
@@ -309,7 +405,7 @@ int main(void)
 //         i++;
 //         rxBufferReadPos++;
 //         if(rxBufferReadPos >= RXBUF_SIZE){
-//             // ³¬³ö»º³åÇø£¬»ØÁã
+//             // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 //             rxBufferReadPos = 0;
 //         }
 //     }
@@ -319,22 +415,22 @@ int main(void)
 // /*********************************************************************
 //  * @fn      uartReadByteWiFi
 //  *
-//  * @brief   ´Ó½ÓÊÕ»º³åÇø¶Á³ö 1 ×Ö½ÚÊý¾Ý
+//  * @brief   ï¿½Ó½ï¿½ï¿½Õ»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ 1 ï¿½Ö½ï¿½ï¿½ï¿½ï¿½ï¿½
 //  *
-//  * @return  char - ·µ»Ø¶Á³öµÄÊý¾Ý(ÎÞÊý¾ÝÒ²·µ»Ø0)
+//  * @return  char - ï¿½ï¿½ï¿½Ø¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½(ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò²ï¿½ï¿½ï¿½ï¿½0)
 //  */
 // char uartReadByteWiFi(void)
 // {
 //     char ret;
 //     uint16_t rxBufferEnd = RXBUF_SIZE - DMA_GetCurrDataCounter(DMA2_Channel7);
 //     if (rxBufferReadPos == rxBufferEnd){
-//         // ÎÞÊý¾Ý£¬·µ»Ø
+//         // ï¿½ï¿½ï¿½ï¿½ï¿½Ý£ï¿½ï¿½ï¿½ï¿½ï¿½
 //         return 0;
 //     }
 //     ret = RxBuffer[rxBufferReadPos];
 //     rxBufferReadPos++;
 //     if(rxBufferReadPos >= RXBUF_SIZE){
-//         // ³¬³ö»º³åÇø£¬»ØÁã
+//         // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 //         rxBufferReadPos = 0;
 //     }
 //     return ret;
@@ -343,14 +439,14 @@ int main(void)
 // /*********************************************************************
 //  * @fn      uartAvailableWiFi
 //  *
-//  * @brief   »ñÈ¡»º³åÇøÖÐ¿É¶ÁÊý¾ÝµÄÊýÁ¿
+//  * @brief   ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð¿É¶ï¿½ï¿½ï¿½ï¿½Ýµï¿½ï¿½ï¿½ï¿½ï¿½
 //  *
-//  * @return  uint16_t - ·µ»Ø¿É¶ÁÊý¾ÝÊýÁ¿
+//  * @return  uint16_t - ï¿½ï¿½ï¿½Ø¿É¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 //  */
 // uint16_t uartAvailableWiFi(void)
 // {
-//     uint16_t rxBufferEnd = RXBUF_SIZE - DMA_GetCurrDataCounter(DMA2_Channel7);//¼ÆËã DMA Êý¾ÝÎ²µÄÎ»ÖÃ
-//     // ¼ÆËã¿É¶Á×Ö½Ú
+//     uint16_t rxBufferEnd = RXBUF_SIZE - DMA_GetCurrDataCounter(DMA2_Channel7);//ï¿½ï¿½ï¿½ï¿½ DMA ï¿½ï¿½ï¿½ï¿½Î²ï¿½ï¿½Î»ï¿½ï¿½
+//     // ï¿½ï¿½ï¿½ï¿½É¶ï¿½ï¿½Ö½ï¿½
 //     if (rxBufferReadPos <= rxBufferEnd){
 //         return rxBufferEnd - rxBufferReadPos;
 //     }else{
@@ -358,7 +454,7 @@ int main(void)
 //     }
 // }
 
-// // ¸¨Öúº¯Êý£ºÇå¿Õ»·ÐÎ½ÓÊÕ»º³åÇøÄÚ»ýÀÛµÄÀ¬»øÊý¾Ý
+// // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Õ»ï¿½ï¿½Î½ï¿½ï¿½Õ»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ú»ï¿½ï¿½Ûµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 // void uartFlushWiFi(void)
 // {
 //     uint16_t num = uartAvailableWiFi();
@@ -378,7 +474,7 @@ int main(void)
 //  */
 // int main(void)
 // {
-// 	int num = 0; // ÓÃÓÚ½ÓÊÕ¿É¶Á×Ö½ÚÊý
+// 	int num = 0; // ï¿½ï¿½ï¿½Ú½ï¿½ï¿½Õ¿É¶ï¿½ï¿½Ö½ï¿½ï¿½ï¿½
 
 // 	NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
 // 	SystemCoreClockUpdate();
@@ -390,45 +486,45 @@ int main(void)
 // 	printf("8266 WiFi TEST\r\n");
 
 // 	LED_Init();
-// 	DMA2__Init();    // µ÷ÓÃÄãµÄ DMA ³õÊ¼»¯
-// 	WIFI8266_Init(); // µ÷ÓÃÄãµÄ UART6 ´®¿Ú³õÊ¼»¯
+// 	DMA2__Init();    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ DMA ï¿½ï¿½Ê¼ï¿½ï¿½
+// 	WIFI8266_Init(); // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ UART6 ï¿½ï¿½ï¿½Ú³ï¿½Ê¼ï¿½ï¿½
 	
-// 	// ·Ç³£ÖØÒª£º¿ªÆô UART6 µÄ DMA ÊÕ·¢ÇëÇó
+// 	// ï¿½Ç³ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ UART6 ï¿½ï¿½ DMA ï¿½Õ·ï¿½ï¿½ï¿½ï¿½ï¿½
 // 	USART_DMACmd(UART6, USART_DMAReq_Tx | USART_DMAReq_Rx, ENABLE);
 
 //     Delay_Ms(1000);
     
 //     /* --------------------------------------------------------
-//      * ? ÓÅ»¯µã 1£ºÉÏµçÊ×ÏÈ¶ÔÄ£¿é½øÐÐ¸´Î»£¬Çå¿ÕËùÓÐ²ÐÁôÁ¬½ÓºÍÄ£Ê½
+//      * ? ï¿½Å»ï¿½ï¿½ï¿½ 1ï¿½ï¿½ï¿½Ïµï¿½ï¿½ï¿½ï¿½È¶ï¿½Ä£ï¿½ï¿½ï¿½ï¿½Ð¸ï¿½Î»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Óºï¿½Ä£Ê½
 //      * -------------------------------------------------------- */
-//     printf("1. ÕýÔÚ¸´Î» WiFi Ä£¿é...\r\n");
+//     printf("1. ï¿½ï¿½ï¿½Ú¸ï¿½Î» WiFi Ä£ï¿½ï¿½...\r\n");
 //     while(uartWriteWiFiStr("AT+RST\r\n")==RESET);
-//     Delay_Ms(3000); // ¸ø×ã 3 ÃëÆô¶¯Ê±¼ä
-//     uartFlushWiFi(); // Çå³ý¸´Î»Êä³öµÄÆô¶¯ÐÅÏ¢£¬±ÜÃâ¸ÉÈÅºóÐø½âÎö
+//     Delay_Ms(3000); // ï¿½ï¿½ï¿½ï¿½ 3 ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½
+//     uartFlushWiFi(); // ï¿½ï¿½ï¿½ï¿½ï¿½Î»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Åºï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 
-//     // ²éÑ¯ WiFi Ä£¿éÊÇ·ñÕý³£¹¤×÷
+//     // ï¿½ï¿½Ñ¯ WiFi Ä£ï¿½ï¿½ï¿½Ç·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 //     while(uartWriteWiFiStr("AT\r\n")==RESET);
 //     Delay_Ms(300);
     
-//     // ²éÑ¯ WiFi Ä£¿é°æ±¾ÐÅÏ¢
+//     // ï¿½ï¿½Ñ¯ WiFi Ä£ï¿½ï¿½æ±¾ï¿½ï¿½Ï¢
 //     while(uartWriteWiFiStr("AT+GMR\r\n")==RESET);
 //     Delay_Ms(300);
     
-//     // ÉèÎª Station Ä£Ê½
+//     // ï¿½ï¿½Îª Station Ä£Ê½
 //     while(uartWriteWiFiStr("AT+CWMODE=1\r\n")==RESET);
 //     Delay_Ms(300);
     
-//     uartFlushWiFi(); // Çå³ýÉÏÃæµÄ»ØÓ¦»ýÑ¹
+//     uartFlushWiFi(); // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä»ï¿½Ó¦ï¿½ï¿½Ñ¹
 
 //     /* --------------------------------------------------------
-//      * ? ÓÅ»¯µã 2£ºWi-Fi Á¬½ÓÂß¼­ÓÅ»¯
+//      * ? ï¿½Å»ï¿½ï¿½ï¿½ 2ï¿½ï¿½Wi-Fi ï¿½ï¿½ï¿½ï¿½ï¿½ß¼ï¿½ï¿½Å»ï¿½
 //      * -------------------------------------------------------- */
-//     printf("2. ¿ªÊ¼Á¬½Ó Wi-Fi ÈÈµã...\r\n");
+//     printf("2. ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½ Wi-Fi ï¿½Èµï¿½...\r\n");
 //     while(uartWriteWiFiStr("AT+CWJAP=\"HONOR V30\",\"12345678\"\r\n")==RESET);
     
-//     // Ñ­»·×èÈû£¬µÈ´ýÄ£¿é¿ªÊ¼·µ»ØÊý¾Ý£¨ËµÃ÷ÎÕÊÖ¿ªÊ¼£©
+//     // Ñ­ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È´ï¿½Ä£ï¿½é¿ªÊ¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý£ï¿½Ëµï¿½ï¿½ï¿½ï¿½ï¿½Ö¿ï¿½Ê¼ï¿½ï¿½
 //     while(uartAvailableWiFi() == 0);
-//     Delay_Ms(5000); // ÎÕÊÖºÍ·ÖÅäIPÐèÒª 5 ÃëÊ±¼ä
+//     Delay_Ms(5000); // ï¿½ï¿½ï¿½ÖºÍ·ï¿½ï¿½ï¿½IPï¿½ï¿½Òª 5 ï¿½ï¿½Ê±ï¿½ï¿½
 
 //     num = uartAvailableWiFi();
 //     if (num > 0 ){
@@ -440,10 +536,10 @@ int main(void)
 //     Delay_Ms(1000);
 
 //     /* --------------------------------------------------------
-//      * ? ÓÅ»¯µã 3£ºÔÚ½¨Á¢ TCP Ç°£¬±ØÐë²éÑ¯ IP£¨È·±£ÄÃµ½·Ç0.0.0.0µÄIP£© [2]
+//      * ? ï¿½Å»ï¿½ï¿½ï¿½ 3ï¿½ï¿½ï¿½Ú½ï¿½ï¿½ï¿½ TCP Ç°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ñ¯ IPï¿½ï¿½È·ï¿½ï¿½ï¿½Ãµï¿½ï¿½ï¿½0.0.0.0ï¿½ï¿½IPï¿½ï¿½ [2]
 //      * -------------------------------------------------------- */
 //     printf("\r\n=================================\r\n");
-//     printf("3. ²éÑ¯·ÖÅäµ½µÄ IP µØÖ·...\r\n");
+//     printf("3. ï¿½ï¿½Ñ¯ï¿½ï¿½ï¿½äµ½ï¿½ï¿½ IP ï¿½ï¿½Ö·...\r\n");
 //     uartFlushWiFi(); 
 //     while(uartWriteWiFiStr("AT+CIFSR\r\n")==RESET);
 //     Delay_Ms(500);
@@ -456,15 +552,15 @@ int main(void)
 //     }
 
 //     /* --------------------------------------------------------
-//      * 4. ³¢ÊÔÁ¬½Ó¹«Íø TCP ·þÎñÆ÷
+//      * 4. ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ó¹ï¿½ï¿½ï¿½ TCP ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 //      * -------------------------------------------------------- */
 //     printf("\r\n=================================\r\n");
-//     printf("4. ³¢ÊÔÁ¬½Ó TCP ·þÎñÆ÷...\r\n");
+//     printf("4. ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ TCP ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½...\r\n");
 //     uartFlushWiFi(); 
 
 //     while(uartWriteWiFiStr("AT+CIPSTART=\"TCP\",\"60.205.167.213\",3390\r\n")==RESET);
     
-//     // ¼àÌý 3 ÃëÖÓ£¬µÈ´ý OK »ò CONNECT
+//     // ï¿½ï¿½ï¿½ï¿½ 3 ï¿½ï¿½ï¿½Ó£ï¿½ï¿½È´ï¿½ OK ï¿½ï¿½ CONNECT
 //     for(int i=0; i<30; i++){
 //         Delay_Ms(100);
 //         num = uartAvailableWiFi();
@@ -477,10 +573,10 @@ int main(void)
 //     }
 
 //     /* --------------------------------------------------------
-//      * 5. ³¢ÊÔ¿ªÆôÍ¸´«Ä£Ê½
+//      * 5. ï¿½ï¿½ï¿½Ô¿ï¿½ï¿½ï¿½Í¸ï¿½ï¿½Ä£Ê½
 //      * -------------------------------------------------------- */
 //     printf("\r\n=================================\r\n");
-//     printf("5. ³¢ÊÔ¿ªÆôÍ¸´«Ä£Ê½...\r\n");
+//     printf("5. ï¿½ï¿½ï¿½Ô¿ï¿½ï¿½ï¿½Í¸ï¿½ï¿½Ä£Ê½...\r\n");
 //     uartFlushWiFi(); 
 //     while(uartWriteWiFiStr("AT+CIPMODE=1\r\n")==RESET);
 //     Delay_Ms(500);
@@ -493,10 +589,10 @@ int main(void)
 //     }
 
 //     /* --------------------------------------------------------
-//      * 6. ×¼±¸·¢ËÍÊý¾Ý (CIPSEND)
+//      * 6. ×¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ (CIPSEND)
 //      * -------------------------------------------------------- */
 //     printf("\r\n=================================\r\n");
-//     printf("6. ×¼±¸·¢ËÍÊý¾Ý (CIPSEND)...\r\n");
+//     printf("6. ×¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ (CIPSEND)...\r\n");
 //     uartFlushWiFi(); 
 //     while(uartWriteWiFiStr("AT+CIPSEND\r\n")==RESET);
 //     Delay_Ms(500);
@@ -509,23 +605,23 @@ int main(void)
 //     }
 
 //     printf("\r\n=================================\r\n");
-//     printf("ÕýÊ½½øÈë´óÑ­»·£¡\r\n");
+//     printf("ï¿½ï¿½Ê½ï¿½ï¿½ï¿½ï¿½ï¿½Ñ­ï¿½ï¿½ï¿½ï¿½\r\n");
 //     uartFlushWiFi(); 
 
 //     int count = 0;
 // 	while(1)
 //     {
-// 		Delay_Ms(1000); // 1ÃëÖÓ·¢Ò»´Î
+// 		Delay_Ms(1000); // 1ï¿½ï¿½ï¿½Ó·ï¿½Ò»ï¿½ï¿½
 		
-// 		// 1. µ¥Æ¬»úÖ÷¶¯Ïò¹«Íø·þÎñÆ÷·¢ËÍÊý¾Ý
+// 		// 1. ï¿½ï¿½Æ¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 //         char sendBuf[64];
 //         sprintf(sendBuf, "Hello SSCOM! count = %d\r\n", count++);
 //         uartWriteWiFiStr(sendBuf); 
 
-// 		// 2. ½ÓÊÕ·þÎñÆ÷·¢¸øµ¥Æ¬»úµÄÊý¾Ý£¬²¢´òÓ¡µ½µ¥Æ¬»úµÄ´®¿ÚÖÕ¶Ë
+// 		// 2. ï¿½ï¿½ï¿½Õ·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý£ï¿½ï¿½ï¿½ï¿½ï¿½Ó¡ï¿½ï¿½ï¿½ï¿½Æ¬ï¿½ï¿½ï¿½Ä´ï¿½ï¿½ï¿½ï¿½Õ¶ï¿½
 //         int num = uartAvailableWiFi();
 //         if (num > 0 ){
-//             // ²ÉÓÃ¹«¹²È«¾Ö»º³åÇø£¬ÏÞÖÆµ¥´Î¶ÁÈ¡³¤¶È£¬±£ÕÏÄÚ´æ°²È«
+//             // ï¿½ï¿½ï¿½Ã¹ï¿½ï¿½ï¿½È«ï¿½Ö»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æµï¿½ï¿½Î¶ï¿½È¡ï¿½ï¿½ï¿½È£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ú´æ°²È«
 //             uint16_t len = (num > sizeof(uart_temp_buf)-1) ? sizeof(uart_temp_buf)-1 : num;
 //             uartReadWiFi(uart_temp_buf, len);
 //             uart_temp_buf[len] = '\0';
