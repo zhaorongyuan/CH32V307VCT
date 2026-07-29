@@ -18,204 +18,12 @@
 #include "task_ota.h"
 
 /**
- * @brief  系统核心底层组件初始化
- */
-static void System_Core_Init(void)
-{
-    /* 配置中断优先级分组 */
-    NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
-
-    /* 更新 SystemCoreClock 变量 */
-    SystemCoreClockUpdate();
-
-    /* 配置 1ms 的 SysTick 定时器并开启中断 */
-    SysTick_Config(SystemCoreClock / 1000U);
-
-    /* 初始化延时组件与调试串口 (115200bps) */
-    Delay_Init();
-    USART_Printf_Init(115200);
-}
-
-int main(void)
-{
-    /* 1. 核心初始化 */
-    System_Core_Init();
-
-    /* 2. 板级外设初始化 (通过 BSW 层) */
-    Board_Init();
-
-    /* 3. HAL 外设初始化 (通过 Interface 层) */
-    API_Led_Init();
-    API_Key_Init();
-    API_Buzzer_Init();
-    API_Wifi_Init();
-
-    /* 4. 业务任务初始化 */
-    Task_Control_Init();
-    Task_OTA_Init();
-
-    /* 开启全局中断 */
-    __enable_irq();
-
-    printf("SystemClk:%d\r\n", SystemCoreClock);
-    printf("ChipID:%08x\r\n", DBGMCU_GetCHIPID());
-    printf("FW: v%d.%d.%d\r\n",
-           APP_FW_VERSION_MAJOR, APP_FW_VERSION_MINOR, APP_FW_VERSION_PATCH);
-
-    /* 调度器时间戳 */
-    uint32_t last_10ms_ticks   = 0;
-    uint32_t last_100ms_ticks  = 0;
-    uint32_t last_1000ms_ticks = 0;
-
-    /* 5. 主循环调度 (Super Loop) */
-    for (;;)
-    {
-        /* Task Control: 10ms 周期执行 */
-        if ((Gc_SysTick_ms - last_10ms_ticks) >= APP_TASK_10MS_PERIOD) {
-            last_10ms_ticks = Gc_SysTick_ms;
-            Task_Control_Update_10ms();
-        }
-
-        /* Task Control: 100ms 周期执行 */
-        if ((Gc_SysTick_ms - last_100ms_ticks) >= APP_TASK_100MS_PERIOD) {
-            last_100ms_ticks = Gc_SysTick_ms;
-            Task_Control_Update_100ms();
-        }
-
-        /* Task Control + OTA: 1000ms 周期执行 */
-        if ((Gc_SysTick_ms - last_1000ms_ticks) >= APP_TASK_1000MS_PERIOD) {
-            last_1000ms_ticks = Gc_SysTick_ms;
-            Task_Control_Update_1000ms();
-            Task_OTA_Update();
-
-            /* CPU 负载率（整数运算，无 FPU） */
-            uint32_t systick_cnt = SysTick->CNT;
-            Gs_CpuLoad_percent = (96000U - systick_cnt) * 100U / 96000U;
-        }
-    }
-}
-/**
- * @file    main.c
- * @brief   程序入口 — Super Loop 调度器
- * @author  zry
- * @date    2026-07-17
- * @version V1.0.0
- *
- * @note    主函数入口，负责系统初始化和周期调度
- * @copyright (c) 2026 zry. All rights reserved.
- */
-
-#include "ch32v30x_conf.h"
-#include "app_cfg.h"
-#include "app_global.h"
-#include "board.h"
-#include "Interface.h"
-#include "task_control.h"
-#include "task_ota.h"
-
-/**
- * @brief  系统核心底层组件初始化
- */
-static void System_Core_Init(void)
-{
-    /* 配置中断优先级分组 */
-    NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
-
-    /* 更新 SystemCoreClock 变量 */
-    SystemCoreClockUpdate();
-
-    /* 配置 1ms 的 SysTick 定时器并开启中断 */
-    SysTick_Config(SystemCoreClock / 1000U);
-
-    /* 初始化延时组件与调试串口 (115200bps) */
-    Delay_Init();
-    USART_Printf_Init(115200);
-}
-
-int main(void)
-{
-    /* 1. 核心初始化 */
-    System_Core_Init();
-
-    /* 2. 板级外设初始化 (通过 BSW 层) */
-    Board_Init();
-
-    /* 3. HAL 外设初始化 (通过 Interface 层) */
-    API_Led_Init();
-    API_Key_Init();
-    API_Buzzer_Init();
-    API_Wifi_Init();
-
-    /* 4. 业务任务初始化 */
-    Task_Control_Init();
-    Task_OTA_Init();
-
-    /* 开启全局中断 */
-    __enable_irq();
-
-    printf("SystemClk:%d\r\n", SystemCoreClock);
-    printf("ChipID:%08x\r\n", DBGMCU_GetCHIPID());
-    printf("FW: v%d.%d.%d\r\n",
-           APP_FW_VERSION_MAJOR, APP_FW_VERSION_MINOR, APP_FW_VERSION_PATCH);
-
-    /* 调度器时间戳 */
-    uint32_t last_10ms_ticks   = 0;
-    uint32_t last_100ms_ticks  = 0;
-    uint32_t last_1000ms_ticks = 0;
-
-    /* 5. 主循环调度 (Super Loop) */
-    for (;;)
-    {
-        /* Task Control: 10ms 周期执行 */
-        if ((Gc_SysTick_ms - last_10ms_ticks) >= APP_TASK_10MS_PERIOD) {
-            last_10ms_ticks = Gc_SysTick_ms;
-            Task_Control_Update_10ms();
-        }
-
-        /* Task Control: 100ms 周期执行 */
-        if ((Gc_SysTick_ms - last_100ms_ticks) >= APP_TASK_100MS_PERIOD) {
-            last_100ms_ticks = Gc_SysTick_ms;
-            Task_Control_Update_100ms();
-        }
-
-        /* Task Control + OTA: 1000ms 周期执行 */
-        if ((Gc_SysTick_ms - last_1000ms_ticks) >= APP_TASK_1000MS_PERIOD) {
-            last_1000ms_ticks = Gc_SysTick_ms;
-            Task_Control_Update_1000ms();
-            Task_OTA_Update();
-
-            /* CPU 负载率（整数运算，无 FPU） */
-            uint32_t systick_cnt = SysTick->CNT;
-            Gs_CpuLoad_percent = (96000U - systick_cnt) * 100U / 96000U;
-        }
-    }
-}
-/**
- * @file    main.c
- * @brief   �������
- * @author  zry
- * @date    2026-07-17
- * @version V1.0.0
- *
- * @note    �����������
- * @copyright (c) 2026 zry. All rights reserved.
- */
-
-#include "ch32v30x_conf.h"
-#include "Interface.h"
-#include "app_cfg.h"
-#include "debug.h"
-
-
-
-/**
- * @brief  ���� SysTick ��ʱ�� (���� CH32V30x RISC-V �淶)
+ * @brief
  */
 void SysTick_Config(uint32_t ticks)
 {
     SysTick->CTLR &= ~(1U << 0);
 
-    /* ��ռ��������жϱ�־λ */
     SysTick->CNT = 0;
     SysTick->SR = 0;
 
@@ -226,94 +34,307 @@ void SysTick_Config(uint32_t ticks)
     SysTick->CTLR |= (1U << 1);
     SysTick->CTLR |= (1U << 0);
 
-    /* �� NVIC ��ʹ�� SysTick �� IRQ ͨ�� */
     NVIC_EnableIRQ(SysTick_IRQn);
 
 }
 
 /**
- * @brief  ϵͳ���ĵײ������ʼ��
+ * @brief  系统核心底层组件初始化
  */
 static void System_Core_Init(void)
 {
-    /* �����ж����ȼ����� */
+    /* 配置中断优先级分组 */
     NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
-    
-    /* ���� SystemCoreClock ���� */
+
+    /* 更新 SystemCoreClock 变量 */
     SystemCoreClockUpdate();
-    
-    /* ���� 1ms �� SysTick ��ʱ���������ж� */
+
+    /* 配置 1ms 的 SysTick 定时器并开启中断 */
     SysTick_Config(SystemCoreClock / 1000U);
-    
-    /* ��ʼ����ʱ�������Դ��� (115200bps) */
+
+    /* 初始化延时组件与调试串口 (115200bps) */
     Delay_Init();
     USART_Printf_Init(115200);
 }
 
-void delay(volatile unsigned int count) {
-while (count--) {
-// ��ѭ��
-}
-}
-
 int main(void)
 {
-    /* 1. ���������Ӳ�������ʼ�� */
+    /* 1. 核心初始化 */
     System_Core_Init();
-    
-    // Board_UartFifo_Init();  /* ������ UART ֮ǰ��ʼ�� */
 
-    // /* 2. Ӳ�������ʼ�� (ͨ�� HAL �ӿ�) */
-    // API_Uart_Init(UART_ID_DEBUG, DBG_UART_BAUD);
-    // API_Led_Init();
-    // API_Button_Init();
-    // API_Buzzer_Init();
+    /* 2. 板级外设初始化 (通过 BSW 层) */
+    Board_Init();
 
-    // /* 3. ҵ�������ʼ�� */
-    // Task_Control_Init();
-    // Task_OTA_Init();
+    /* 3. HAL 外设初始化 (通过 Interface 层) */
+    API_Led_Init();
+    API_Key_Init();
+    API_Buzzer_Init();
+    API_Wifi_Init();
 
-    /* ����ȫ���ж� */
+    /* 4. 业务任务初始化 */
+    Task_Control_Init();
+    Task_OTA_Init();
+
+    /* 开启全局中断 */
     __enable_irq();
 
-    /* ������ʱ������������ֱ�Ϊ��ͬ��ִ�����ڷ��������״̬�Ĵ��� */
+    printf("SystemClk:%d\r\n", SystemCoreClock);
+    printf("ChipID:%08x\r\n", DBGMCU_GetCHIPID());
+    printf("FW: v%d.%d.%d\r\n",
+           APP_FW_VERSION_MAJOR, APP_FW_VERSION_MINOR, APP_FW_VERSION_PATCH);
+
+    /* 调度器时间戳 */
     uint32_t last_10ms_ticks   = 0;
     uint32_t last_100ms_ticks  = 0;
     uint32_t last_1000ms_ticks = 0;
 
-    /* 4. ��ѭ������ (Super Loop) */
-    for(;;)
+    /* 5. 主循环调度 (Super Loop) */
+    for (;;)
     {
-        delay(1000);
-
-        /* Task Control: 10ms ����ִ�� */
+        /* Task Control: 10ms 周期执行 */
         if ((Gc_SysTick_ms - last_10ms_ticks) >= APP_TASK_10MS_PERIOD) {
             last_10ms_ticks = Gc_SysTick_ms;
-
-            // Task_Control_Update_10ms();
+            Task_Control_Update_10ms();
         }
 
-        /* Task Control: 100ms ����ִ�� */
+        /* Task Control: 100ms 周期执行 */
         if ((Gc_SysTick_ms - last_100ms_ticks) >= APP_TASK_100MS_PERIOD) {
             last_100ms_ticks = Gc_SysTick_ms;
-            
-            // Task_Control_Update_100ms();
+            Task_Control_Update_100ms();
         }
 
-        /* Task Control: 1000ms ����ִ�� */
+        /* Task Control + OTA: 1000ms 周期执行 */
         if ((Gc_SysTick_ms - last_1000ms_ticks) >= APP_TASK_1000MS_PERIOD) {
             last_1000ms_ticks = Gc_SysTick_ms;
-            
-            // Task_Control_Update_1000ms();
+            Task_Control_Update_1000ms();
+            // Task_OTA_Update();
 
-            // CPU ������
-            uint32_t sysstick_cnt = SysTick->CNT;
-            Gs_CpuLoad_tick = ((float)(96000U - sysstick_cnt) / 96000.0f) * 100.0f;
-            printf("Gs_CpuLoad_tick: %u ,\n", (uint32_t)Gs_CpuLoad_tick);
-            
+            /* CPU 负载率（整数运算，无 FPU） */
+            uint32_t systick_cnt = SysTick->CNT;
+            Gs_CpuLoad_percent = (96000U - systick_cnt) * 100U / 96000U;
         }
     }
 }
+// /**
+//  * @file    main.c
+//  * @brief   程序入口 — Super Loop 调度器
+//  * @author  zry
+//  * @date    2026-07-17
+//  * @version V1.0.0
+//  *
+//  * @note    主函数入口，负责系统初始化和周期调度
+//  * @copyright (c) 2026 zry. All rights reserved.
+//  */
+
+// #include "ch32v30x_conf.h"
+// #include "app_cfg.h"
+// #include "app_global.h"
+// #include "board.h"
+// #include "Interface.h"
+// #include "task_control.h"
+// #include "task_ota.h"
+
+// /**
+//  * @brief  系统核心底层组件初始化
+//  */
+// static void System_Core_Init(void)
+// {
+//     /* 配置中断优先级分组 */
+//     NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
+
+//     /* 更新 SystemCoreClock 变量 */
+//     SystemCoreClockUpdate();
+
+//     /* 配置 1ms 的 SysTick 定时器并开启中断 */
+//     SysTick_Config(SystemCoreClock / 1000U);
+
+//     /* 初始化延时组件与调试串口 (115200bps) */
+//     Delay_Init();
+//     USART_Printf_Init(115200);
+// }
+
+// int main(void)
+// {
+//     /* 1. 核心初始化 */
+//     System_Core_Init();
+
+//     /* 2. 板级外设初始化 (通过 BSW 层) */
+//     Board_Init();
+
+//     /* 3. HAL 外设初始化 (通过 Interface 层) */
+//     API_Led_Init();
+//     API_Key_Init();
+//     API_Buzzer_Init();
+//     API_Wifi_Init();
+
+//     /* 4. 业务任务初始化 */
+//     Task_Control_Init();
+//     Task_OTA_Init();
+
+//     /* 开启全局中断 */
+//     __enable_irq();
+
+//     printf("SystemClk:%d\r\n", SystemCoreClock);
+//     printf("ChipID:%08x\r\n", DBGMCU_GetCHIPID());
+//     printf("FW: v%d.%d.%d\r\n",
+//            APP_FW_VERSION_MAJOR, APP_FW_VERSION_MINOR, APP_FW_VERSION_PATCH);
+
+//     /* 调度器时间戳 */
+//     uint32_t last_10ms_ticks   = 0;
+//     uint32_t last_100ms_ticks  = 0;
+//     uint32_t last_1000ms_ticks = 0;
+
+//     /* 5. 主循环调度 (Super Loop) */
+//     for (;;)
+//     {
+//         /* Task Control: 10ms 周期执行 */
+//         if ((Gc_SysTick_ms - last_10ms_ticks) >= APP_TASK_10MS_PERIOD) {
+//             last_10ms_ticks = Gc_SysTick_ms;
+//             Task_Control_Update_10ms();
+//         }
+
+//         /* Task Control: 100ms 周期执行 */
+//         if ((Gc_SysTick_ms - last_100ms_ticks) >= APP_TASK_100MS_PERIOD) {
+//             last_100ms_ticks = Gc_SysTick_ms;
+//             Task_Control_Update_100ms();
+//         }
+
+//         /* Task Control + OTA: 1000ms 周期执行 */
+//         if ((Gc_SysTick_ms - last_1000ms_ticks) >= APP_TASK_1000MS_PERIOD) {
+//             last_1000ms_ticks = Gc_SysTick_ms;
+//             Task_Control_Update_1000ms();
+//             Task_OTA_Update();
+
+//             /* CPU 负载率（整数运算，无 FPU） */
+//             uint32_t systick_cnt = SysTick->CNT;
+//             Gs_CpuLoad_percent = (96000U - systick_cnt) * 100U / 96000U;
+//         }
+//     }
+// }
+// /**
+//  * @file    main.c
+//  * @brief   �������
+//  * @author  zry
+//  * @date    2026-07-17
+//  * @version V1.0.0
+//  *
+//  * @note    �����������
+//  * @copyright (c) 2026 zry. All rights reserved.
+//  */
+
+// #include "ch32v30x_conf.h"
+// #include "Interface.h"
+// #include "app_cfg.h"
+// #include "debug.h"
+
+
+
+// /**
+//  * @brief  ���� SysTick ��ʱ�� (���� CH32V30x RISC-V �淶)
+//  */
+// void SysTick_Config(uint32_t ticks)
+// {
+//     SysTick->CTLR &= ~(1U << 0);
+
+//     /* ��ռ��������жϱ�־λ */
+//     SysTick->CNT = 0;
+//     SysTick->SR = 0;
+
+//     SysTick->CMP = ticks - 1;
+
+//     SysTick->CTLR |= (1U << 4) | (1U << 3) | (1U << 2);     
+//     SysTick->CTLR |= (1U << 5);
+//     SysTick->CTLR |= (1U << 1);
+//     SysTick->CTLR |= (1U << 0);
+
+//     /* �� NVIC ��ʹ�� SysTick �� IRQ ͨ�� */
+//     NVIC_EnableIRQ(SysTick_IRQn);
+
+// }
+
+// /**
+//  * @brief  ϵͳ���ĵײ������ʼ��
+//  */
+// static void System_Core_Init(void)
+// {
+//     /* �����ж����ȼ����� */
+//     NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
+    
+//     /* ���� SystemCoreClock ���� */
+//     SystemCoreClockUpdate();
+    
+//     /* ���� 1ms �� SysTick ��ʱ���������ж� */
+//     SysTick_Config(SystemCoreClock / 1000U);
+    
+//     /* ��ʼ����ʱ�������Դ��� (115200bps) */
+//     Delay_Init();
+//     USART_Printf_Init(115200);
+// }
+
+// void delay(volatile unsigned int count) {
+// while (count--) {
+// // ��ѭ��
+// }
+// }
+
+// int main(void)
+// {
+//     /* 1. ���������Ӳ�������ʼ�� */
+//     System_Core_Init();
+    
+//     // Board_UartFifo_Init();  /* ������ UART ֮ǰ��ʼ�� */
+
+//     // /* 2. Ӳ�������ʼ�� (ͨ�� HAL �ӿ�) */
+//     // API_Uart_Init(UART_ID_DEBUG, DBG_UART_BAUD);
+//     // API_Led_Init();
+//     // API_Button_Init();
+//     // API_Buzzer_Init();
+
+//     // /* 3. ҵ�������ʼ�� */
+//     // Task_Control_Init();
+//     // Task_OTA_Init();
+
+//     /* ����ȫ���ж� */
+//     __enable_irq();
+
+//     /* ������ʱ������������ֱ�Ϊ��ͬ��ִ�����ڷ��������״̬�Ĵ��� */
+//     uint32_t last_10ms_ticks   = 0;
+//     uint32_t last_100ms_ticks  = 0;
+//     uint32_t last_1000ms_ticks = 0;
+
+//     /* 4. ��ѭ������ (Super Loop) */
+//     for(;;)
+//     {
+//         delay(1000);
+
+//         /* Task Control: 10ms ����ִ�� */
+//         if ((Gc_SysTick_ms - last_10ms_ticks) >= APP_TASK_10MS_PERIOD) {
+//             last_10ms_ticks = Gc_SysTick_ms;
+
+//             // Task_Control_Update_10ms();
+//         }
+
+//         /* Task Control: 100ms ����ִ�� */
+//         if ((Gc_SysTick_ms - last_100ms_ticks) >= APP_TASK_100MS_PERIOD) {
+//             last_100ms_ticks = Gc_SysTick_ms;
+            
+//             // Task_Control_Update_100ms();
+//         }
+
+//         /* Task Control: 1000ms ����ִ�� */
+//         if ((Gc_SysTick_ms - last_1000ms_ticks) >= APP_TASK_1000MS_PERIOD) {
+//             last_1000ms_ticks = Gc_SysTick_ms;
+            
+//             // Task_Control_Update_1000ms();
+
+//             // CPU ������
+//             uint32_t sysstick_cnt = SysTick->CNT;
+//             Gs_CpuLoad_tick = ((float)(96000U - sysstick_cnt) / 96000.0f) * 100.0f;
+//             printf("Gs_CpuLoad_tick: %u ,\n", (uint32_t)Gs_CpuLoad_tick);
+            
+//         }
+//     }
+// }
 
 
 

@@ -57,7 +57,7 @@ void HardFault_Handler(void)
  */
 void SysTick_Handler(void)
 {
-  SysTick->SR = 0; //���������־λ
+  SysTick->SR = 0;
   Gc_SysTick_ms++;
 
 }
