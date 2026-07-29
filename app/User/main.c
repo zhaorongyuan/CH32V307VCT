@@ -96,6 +96,102 @@ int main(void)
 }
 /**
  * @file    main.c
+ * @brief   程序入口 — Super Loop 调度器
+ * @author  zry
+ * @date    2026-07-17
+ * @version V1.0.0
+ *
+ * @note    主函数入口，负责系统初始化和周期调度
+ * @copyright (c) 2026 zry. All rights reserved.
+ */
+
+#include "ch32v30x_conf.h"
+#include "app_cfg.h"
+#include "app_global.h"
+#include "board.h"
+#include "Interface.h"
+#include "task_control.h"
+#include "task_ota.h"
+
+/**
+ * @brief  系统核心底层组件初始化
+ */
+static void System_Core_Init(void)
+{
+    /* 配置中断优先级分组 */
+    NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
+
+    /* 更新 SystemCoreClock 变量 */
+    SystemCoreClockUpdate();
+
+    /* 配置 1ms 的 SysTick 定时器并开启中断 */
+    SysTick_Config(SystemCoreClock / 1000U);
+
+    /* 初始化延时组件与调试串口 (115200bps) */
+    Delay_Init();
+    USART_Printf_Init(115200);
+}
+
+int main(void)
+{
+    /* 1. 核心初始化 */
+    System_Core_Init();
+
+    /* 2. 板级外设初始化 (通过 BSW 层) */
+    Board_Init();
+
+    /* 3. HAL 外设初始化 (通过 Interface 层) */
+    API_Led_Init();
+    API_Key_Init();
+    API_Buzzer_Init();
+    API_Wifi_Init();
+
+    /* 4. 业务任务初始化 */
+    Task_Control_Init();
+    Task_OTA_Init();
+
+    /* 开启全局中断 */
+    __enable_irq();
+
+    printf("SystemClk:%d\r\n", SystemCoreClock);
+    printf("ChipID:%08x\r\n", DBGMCU_GetCHIPID());
+    printf("FW: v%d.%d.%d\r\n",
+           APP_FW_VERSION_MAJOR, APP_FW_VERSION_MINOR, APP_FW_VERSION_PATCH);
+
+    /* 调度器时间戳 */
+    uint32_t last_10ms_ticks   = 0;
+    uint32_t last_100ms_ticks  = 0;
+    uint32_t last_1000ms_ticks = 0;
+
+    /* 5. 主循环调度 (Super Loop) */
+    for (;;)
+    {
+        /* Task Control: 10ms 周期执行 */
+        if ((Gc_SysTick_ms - last_10ms_ticks) >= APP_TASK_10MS_PERIOD) {
+            last_10ms_ticks = Gc_SysTick_ms;
+            Task_Control_Update_10ms();
+        }
+
+        /* Task Control: 100ms 周期执行 */
+        if ((Gc_SysTick_ms - last_100ms_ticks) >= APP_TASK_100MS_PERIOD) {
+            last_100ms_ticks = Gc_SysTick_ms;
+            Task_Control_Update_100ms();
+        }
+
+        /* Task Control + OTA: 1000ms 周期执行 */
+        if ((Gc_SysTick_ms - last_1000ms_ticks) >= APP_TASK_1000MS_PERIOD) {
+            last_1000ms_ticks = Gc_SysTick_ms;
+            Task_Control_Update_1000ms();
+            Task_OTA_Update();
+
+            /* CPU 负载率（整数运算，无 FPU） */
+            uint32_t systick_cnt = SysTick->CNT;
+            Gs_CpuLoad_percent = (96000U - systick_cnt) * 100U / 96000U;
+        }
+    }
+}
+/**
+ * @file    main.c
  * @brief   �������
  * @author  zry
  * @date    2026-07-17
