@@ -3,6 +3,10 @@
 		{
 			"file": "User/main.c",
 			"encoding": "utf8"
+		},
+		{
+			"file": "User/app_cfg.h",
+			"encoding": "utf8"
 		}
 	]
 }
