@@ -3,7 +3,7 @@
  * @brief   全局共享变量定义
  * @author  zry
  * @date    2026-07-17
- * @version V1.0.0
+ * @version V0.0.1
  *
  * @note    所有跨模块共享的全局变量在此定义
  * @copyright (c) 2026 zry. All rights reserved.

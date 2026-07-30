@@ -1,11 +1,11 @@
 /**
  * @file    app_cfg.h
- * @brief   Ó¦ÓÃ¼¶È«¾ÖÅäÖÃ£¨°æ±¾ºÅ¡¢WiFi¡¢·þÎñÆ÷¡¢ÈÎÎñÖÜÆÚ£©
+ * @brief   Ó¦ï¿½Ã¼ï¿½È«ï¿½ï¿½ï¿½ï¿½ï¿½Ã£ï¿½ï¿½æ±¾ï¿½Å¡ï¿½WiFiï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ú£ï¿½
  * @author  zry
  * @date    2026-07-17
- * @version V1.0.0
+ * @version V0.0.1
  *
- * @note    ÒµÎñ²ÎÊý
+ * @note    Òµï¿½ï¿½ï¿½ï¿½ï¿½
  * @copyright (c) 2026 zry. All rights reserved.
  */
  
@@ -17,20 +17,20 @@
 
 /* Global define */
 
-/* ¹Ì¼þ°æ±¾ */
+/* ï¿½Ì¼ï¿½ï¿½æ±¾ */
 #define APP_FW_VERSION_MAJOR    (1U)
 #define APP_FW_VERSION_MINOR    (0U)
 #define APP_FW_VERSION_PATCH    (0U)
 
-/* WiFi ÅäÖÃ */
+/* WiFi ï¿½ï¿½ï¿½ï¿½ */
 #define APP_WIFI_SSID           "MySSID"
 #define APP_WIFI_PASSWORD       "MyPassword"
 
-/* ·þÎñÆ÷ÅäÖÃ */
+/* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
 #define APP_SERVER_IP           "192.168.1.100"
 #define APP_SERVER_PORT         (8080U)
 
-/* ÈÎÎñÖÜÆÚ (ms) */
+/* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ (ms) */
 #define APP_TASK_1MS_PERIOD     (1U)
 #define APP_TASK_10MS_PERIOD    (10U)
 #define APP_TASK_100MS_PERIOD   (100U)

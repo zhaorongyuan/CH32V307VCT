@@ -4,7 +4,7 @@
  * @details 包含 UART1, UART2, WiFi(UART6), BLE(UART7) 物理引脚与协议参数数据描述。
  * @author  zry
  * @date    2026-07-30
- * @version V2.2.0
+ * @version V0.0.1
  *
  * @note    System HLR Traceability: [REQ-HLR-BSP-003]
  * @copyright (c) 2026 zry. All rights reserved.

@@ -3,7 +3,7 @@
  * @brief   控制任务声明（10ms / 100ms / 1000ms 周期调度）
  * @author  zry
  * @date    2026-07-17
- * @version V1.0.0
+ * @version V0.0.1
  *
  * @note    由 main() 中的 Super Loop 调度器按周期调用
  * @copyright (c) 2026 zry. All rights reserved.

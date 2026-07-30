@@ -4,7 +4,7 @@
  * @details 采用 static inline 强化类型安全，屏蔽电路电平极性。
  * @author  zry
  * @date    2026-07-30
- * @version V2.2.0
+ * @version V0.0.1
  *
  * @note    System HLR Traceability: [REQ-HLR-BSP-004]
  * @copyright (c) 2026 zry. All rights reserved.

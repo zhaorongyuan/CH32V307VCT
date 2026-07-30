@@ -3,7 +3,7 @@
  * @brief   全局共享变量声明（跨模块/跨层使用）
  * @author  zry
  * @date    2026-07-17
- * @version V1.0.0
+ * @version V0.0.1
  *
  * @note    中断与主循环共享的变量需加 volatile 修饰
  * @copyright (c) 2026 zry. All rights reserved.

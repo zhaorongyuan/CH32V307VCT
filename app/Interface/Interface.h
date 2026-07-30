@@ -3,7 +3,7 @@
  * @brief   统一 HAL 接口层 — 所有硬件 API 声明
  * @author  zry
  * @date    2026-07-17
- * @version V1.0.0
+ * @version V0.0.1
  *
  * @note    APP 层只能调用本文件声明的 API，不得直接访问 BSW 层
  * @copyright (c) 2026 zry. All rights reserved.

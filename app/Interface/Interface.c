@@ -3,7 +3,7 @@
  * @brief   统一 HAL 接口层 — 所有硬件 API 实现
  * @author  zry
  * @date    2026-07-17
- * @version V1.0.0
+ * @version V0.0.1
  *
  * @note    内部调用 BSW 层完成实际操作，对外仅暴露 API_* 接口
  * @copyright (c) 2026 zry. All rights reserved.

@@ -3,7 +3,7 @@
  * @brief   程序入口 — Super Loop 调度器
  * @author  zry
  * @date    2026-07-17
- * @version V1.0.0
+ * @version V0.0.1
  *
  * @note    主函数入口，负责系统初始化和周期调度
  * @copyright (c) 2026 zry. All rights reserved.
@@ -120,7 +120,7 @@ int main(void)
 //  * @brief   程序入口 — Super Loop 调度器
 //  * @author  zry
 //  * @date    2026-07-17
-//  * @version V1.0.0
+//  * @version V0.0.1
 //  *
 //  * @note    主函数入口，负责系统初始化和周期调度
 //  * @copyright (c) 2026 zry. All rights reserved.
@@ -216,7 +216,7 @@ int main(void)
 //  * @brief   �������
 //  * @author  zry
 //  * @date    2026-07-17
-//  * @version V1.0.0
+//  * @version V0.0.1
 //  *
 //  * @note    �����������
 //  * @copyright (c) 2026 zry. All rights reserved.

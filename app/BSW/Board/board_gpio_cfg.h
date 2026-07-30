@@ -4,7 +4,7 @@
  * @details 定义离散量基础 GPIO 的数据驱动抽象结构体与配置项。
  * @author  zry
  * @date    2026-07-30
- * @version V2.2.0
+ * @version V0.0.1
  *
  * @note    System HLR Traceability: [REQ-HLR-BSP-002]
  * @copyright (c) 2026 zry. All rights reserved.
