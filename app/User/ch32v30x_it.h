@@ -13,7 +13,6 @@
 #define __CH32V30x_IT_H
 
 #include "debug.h"
-#include "Interface.h"
 
 
 #endif /* __CH32V30x_IT_H */

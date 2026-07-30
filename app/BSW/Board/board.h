@@ -1,12 +1,12 @@
 /**
  * @file    board.h
- * @brief   板级支持包 (BSP) 抽象接口头文件
- * @details 屏蔽硬件低电平/高电平有效差异，向上层提供一致的控制与读取接口。
+ * @brief   板级支持包 (BSP) 抽象接口头文件（DAL-A/B 级加固版）
+ * @details 采用 static inline 强化类型安全，屏蔽电路电平极性。
  * @author  zry
- * @date    2026-07-29
- * @version V2.0.0
+ * @date    2026-07-30
+ * @version V2.2.0
  *
- * @docref  BSP-INTERFACE-SPEC-V2
+ * @note    System HLR Traceability: [REQ-HLR-BSP-004]
  * @copyright (c) 2026 zry. All rights reserved.
  */
 
@@ -19,48 +19,72 @@ extern "C" {
 
 #include "ch32v30x.h"
 #include "board_pin.h"
+#include "board_gpio_cfg.h"
 #include "board_uart_cfg.h"
 
-/* ============================================================================ */
-/* 1. LED 控制功能宏 (屏蔽输出 0 点亮逻辑)                                      */
-/* ============================================================================ */
-#define BOARD_LED1_ON()         GPIO_ResetBits(LED1_PORT, LED1_PIN)
-#define BOARD_LED1_OFF()        GPIO_SetBits(LED1_PORT, LED1_PIN)
-#define BOARD_LED1_TOGGLE()     ((GPIO_ReadOutputDataBit(LED1_PORT, LED1_PIN) != 0U) ? \
-                                 GPIO_ResetBits(LED1_PORT, LED1_PIN) : \
-                                 GPIO_SetBits(LED1_PORT, LED1_PIN))
-
-#define BOARD_LED2_ON()         GPIO_ResetBits(LED2_PORT, LED2_PIN)
-#define BOARD_LED2_OFF()        GPIO_SetBits(LED2_PORT, LED2_PIN)
-#define BOARD_LED2_TOGGLE()     ((GPIO_ReadOutputDataBit(LED2_PORT, LED2_PIN) != 0U) ? \
-                                 GPIO_ResetBits(LED2_PORT, LED2_PIN) : \
-                                 GPIO_SetBits(LED2_PORT, LED2_PIN))
+/**
+ * @brief BSP 操作状态枚举定义
+ */
+typedef enum {
+    BOARD_OK = 0x00U,               /* 操作成功 */
+    BOARD_ERR_INVALID_PARAM = 0x01U,/* 非法参数或空指针 */
+    BOARD_ERR_HW_TIMEOUT = 0x02U    /* 硬件响应超时 */
+} Board_Status_t;
 
 /* ============================================================================ */
-/* 2. 按键与开关读取宏 (触发统一返回 1，未触发返回 0)                            */
+/* 1. LED 控制内联函数 (MISRA-C:2012 强类型合规)                                 */
 /* ============================================================================ */
-#define BOARD_KEY_WAKEUP_READ() (GPIO_ReadInputDataBit(KEY_WAKEUP_PORT, KEY_WAKEUP_PIN) == Bit_SET)
-#define BOARD_KEY_SW1_READ()    (GPIO_ReadInputDataBit(KEY_SW1_PORT, KEY_SW1_PIN) == Bit_RESET)
-#define BOARD_KEY_SW2_READ()    (GPIO_ReadInputDataBit(KEY_SW2_PORT, KEY_SW2_PIN) == Bit_RESET)
 
-#define BOARD_JOY_UP_READ()     (GPIO_ReadInputDataBit(JOY_UP_PORT, JOY_UP_PIN) == Bit_RESET)
-#define BOARD_JOY_DOWN_READ()   (GPIO_ReadInputDataBit(JOY_DOWN_PORT, JOY_DOWN_PIN) == Bit_RESET)
-#define BOARD_JOY_LEFT_READ()   (GPIO_ReadInputDataBit(JOY_LEFT_PORT, JOY_LEFT_PIN) == Bit_RESET)
-#define BOARD_JOY_RIGHT_READ()  (GPIO_ReadInputDataBit(JOY_RIGHT_PORT, JOY_RIGHT_PIN) == Bit_RESET)
-#define BOARD_JOY_SEL_READ()    (GPIO_ReadInputDataBit(JOY_SEL_PORT, JOY_SEL_PIN) == Bit_RESET)
+/**
+ * @brief   点亮 LED1
+ * @details 硬件电平驱动：输出低电平点亮。
+ * @return  void
+ * 
+ * @note    LLR Traceability: [REQ-SW-BSP-0104]
+ * @note    Safety Criticality: DAL-B / Bounded Execution
+ */
+static inline void Board_Led1_On(void)
+{
+    GPIO_ResetBits(LED1_PORT, LED1_PIN);
+}
+
+/**
+ * @brief   熄灭 LED1
+ * @details 硬件电平驱动：输出高电平熄灭。
+ * @return  void
+ * 
+ * @note    LLR Traceability: [REQ-SW-BSP-0104]
+ * @note    Safety Criticality: DAL-B / Bounded Execution
+ */
+static inline void Board_Led1_Off(void)
+{
+    GPIO_SetBits(LED1_PORT, LED1_PIN);
+}
+
+/**
+ * @brief   翻转 LED1 状态
+ * @details 读取当前输出锁存状态并取反翻转（显式与 Bit_RESET 校验）。
+ * @return  void
+ * 
+ * @note    LLR Traceability: [REQ-SW-BSP-0104]
+ * @note    Safety Criticality: DAL-B / Zero Ambiguity
+ */
+static inline void Board_Led1_Toggle(void)
+{
+    const uint8_t ucBitState = GPIO_ReadOutputDataBit(LED1_PORT, LED1_PIN);
+    if (ucBitState != (uint8_t)Bit_RESET) {
+        GPIO_ResetBits(LED1_PORT, LED1_PIN);
+    } else {
+        GPIO_SetBits(LED1_PORT, LED1_PIN);
+    }
+}
 
 /* ============================================================================ */
-/* 3. 音频通道切换宏                                                             */
+/* 2. 板级初始化对外 API 声明                                                   */
 /* ============================================================================ */
-#define BOARD_AUDIO_SET_REC()   GPIO_SetBits(AUDIO_CTL_PORT, AUDIO_CTL_PIN)
-#define BOARD_AUDIO_SET_PLAY()  GPIO_ResetBits(AUDIO_CTL_PORT, AUDIO_CTL_PIN)
-
-/* ============================================================================ */
-/* 4. 对外导出的 API 声明                                                       */
-/* ============================================================================ */
-void Board_Init(void);
-void Board_Gpio_Init(void);
-void Board_Uart_Init(void);
+Board_Status_t Board_Init(void);
+Board_Status_t Board_Gpio_Init(void);
+Board_Status_t Board_Uart_Init(void);
 
 #ifdef __cplusplus
 }

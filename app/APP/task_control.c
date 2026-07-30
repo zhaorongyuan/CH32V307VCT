@@ -12,6 +12,7 @@
 #include "task_control.h"
 #include "Interface.h"
 #include "app_global.h"
+#include "board.h"
 
 /**
  * @brief  控制任务初始化
@@ -43,4 +44,6 @@ void Task_Control_Update_100ms(void)
 void Task_Control_Update_1000ms(void)
 {
     /* TODO: 低频逻辑 */
+    Board_Led1_Toggle();
+    printf("Board_Led1_Toggle \r\n");
 }

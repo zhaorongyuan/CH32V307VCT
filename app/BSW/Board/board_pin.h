@@ -5,10 +5,10 @@
  *          符合 DO-178C HSI Data 规范 (DO-178C Section 11.13)。
  * @author  zry
  * @date    2026-07-29
- * @version V2.1.0
+ * @version V2.2.0
  *
+ * @note    System HLR Traceability: [REQ-HLR-BSP-002]
  * @docref  HSI-SPEC-CH32V30X-REV2
- * @note    更换硬件平台时修改此文件，保持上层驱动与抽象层不变。
  * @copyright (c) 2026 zry. All rights reserved.
  */
 
