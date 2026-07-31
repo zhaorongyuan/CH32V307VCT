@@ -33,7 +33,7 @@
 #include "ch32v30x_tim.h"
 #include "ch32v30x_usart.h"
 #include "ch32v30x_wwdg.h"
-#include "ch32v30x_it.h"
+// #include "ch32v30x_it.h"
 #include "ch32v30x_misc.h"
 
 

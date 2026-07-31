@@ -11,7 +11,6 @@
 *******************************************************************************/
 #include "ch32v30x_it.h"
 #include "ch32v30x_gpio.h"
-#include "app_global.h"
 
 
 void NMI_Handler(void) __attribute__((interrupt("WCH-Interrupt-fast")));

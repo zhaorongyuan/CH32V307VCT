@@ -11,11 +11,11 @@
 
 #include "ch32v30x_conf.h"
 #include "app_cfg.h"
-#include "app_global.h"
 #include "board.h"
 #include "Interface.h"
 #include "task_control.h"
 #include "task_ota.h"
+#include "debug.h"
 
 /* SysTick 1ms 重载值 */
 static uint32_t s_systick_reload_val = 0;
