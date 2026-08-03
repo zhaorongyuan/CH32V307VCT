@@ -9,7 +9,6 @@
 * Attention: This software (modified or not) and binary are used for 
 * microcontroller manufactured by Nanjing Qinheng Microelectronics.
 *******************************************************************************/
-#include "ch32v30x_it.h"
 #include "ch32v30x_gpio.h"
 
 
@@ -57,7 +56,7 @@ void HardFault_Handler(void)
 void SysTick_Handler(void)
 {
   SysTick->SR = 0;
-  Gc_SysTick_ms++;
+  // Gc_SysTick_ms++;
 
 }
 

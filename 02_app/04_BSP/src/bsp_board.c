@@ -10,8 +10,32 @@
  * @copyright (c) 2026 zry. All rights reserved.
  */
 
-#include "board.h"
+#include "bsp_board.h"
 #include <stddef.h>
+#include "board_systick.h"
+#include "debug.h"
+
+
+
+/**
+ * @brief  系统核心底层组件初始化
+ */
+void System_Core_Init(void)
+{
+    /* 配置中断优先级分组 */
+    NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
+
+    /* 更新 SystemCoreClock 变量 */
+    SystemCoreClockUpdate();
+
+    /* 注意：如果 Delay_Init 使用了 SysTick，请确认其不会关闭中断。
+       建议优先初始化 Delay，再配置 SysTick 心跳中断 */
+    Delay_Init();
+    USART_Printf_Init(115200);
+
+    /* 配置 1ms 的 SysTick 心跳中断 */
+    SysTick_Config(SystemCoreClock);
+}
 
 
 /* 私有函数声明 */
