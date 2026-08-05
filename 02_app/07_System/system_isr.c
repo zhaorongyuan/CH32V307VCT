@@ -10,6 +10,8 @@
 * microcontroller manufactured by Nanjing Qinheng Microelectronics.
 *******************************************************************************/
 #include "ch32v30x_gpio.h"
+#include "bsp_board.h"
+#include "board_systick.h"
 
 
 void NMI_Handler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
@@ -56,10 +58,5 @@ void HardFault_Handler(void)
 void SysTick_Handler(void)
 {
   SysTick->SR = 0;
-  // Gc_SysTick_ms++;
-
+  BSP_SysTick_Inc();
 }
-
-
-
-

@@ -20,6 +20,12 @@
 void Task_Control_Init(void);
 
 /**
+ * @brief  1ms 周期任务
+ * @note   用于超高频控制逻辑（如 PID 调节、输入采样）
+ */
+void Task_Control_Update_1ms(void);
+
+/**
  * @brief  10ms 周期任务
  * @note   用于高频控制逻辑（如 PID 调节、输入采样）
  */

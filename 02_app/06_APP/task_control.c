@@ -10,9 +10,7 @@
  */
 
 #include "task_control.h"
-#include "Interface.h"
-#include "app_global.h"
-#include "board.h"
+#include "debug.h"
 
 /**
  * @brief  控制任务初始化
@@ -20,6 +18,14 @@
 void Task_Control_Init(void)
 {
     /* TODO: 控制任务相关变量/状态初始化 */
+}
+
+/**
+ * @brief  10ms 周期任务
+ */
+void Task_Control_Update_1ms(void)
+{
+    /* TODO: 超高频控制逻辑 */
 }
 
 /**
@@ -44,6 +50,5 @@ void Task_Control_Update_100ms(void)
 void Task_Control_Update_1000ms(void)
 {
     /* TODO: 低频逻辑 */
-    Board_Led1_Toggle();
-    printf("Board_Led1_Toggle \r\n");
+    printf("1s tick \r\n");
 }

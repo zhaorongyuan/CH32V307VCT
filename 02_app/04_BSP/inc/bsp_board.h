@@ -18,25 +18,28 @@ extern "C" {
 #endif
 
 #include "ch32v30x.h"
-#include "board_gpio_cfg.h"
-#include "board_uart_cfg.h"
+#include "sys_health.h"      /* 07_System: 健康监控、看门狗与 Fault 捕获 */
+// #include "board_gpio_cfg.h"
+// #include "board_uart_cfg.h"
 
-/**
- * @brief BSP 操作状态枚举定义
- */
-typedef enum {
-    BOARD_OK = 0x00U,               /* 操作成功 */
-    BOARD_ERR_INVALID_PARAM = 0x01U,/* 非法参数或空指针 */
-    BOARD_ERR_HW_TIMEOUT = 0x02U    /* 硬件响应超时 */
-} Board_Status_t;
 
-/* ============================================================================ */
-/* 2. 板级初始化对外 API 声明                                                   */
-/* ============================================================================ */
-void System_Core_Init(void);
-Board_Status_t Board_Init(void);
-Board_Status_t Board_Gpio_Init(void);
-Board_Status_t Board_Uart_Init(void);
+// /**
+//  * @brief BSP 操作状态枚举定义
+//  */
+// typedef enum {
+//     BOARD_OK = 0x00U,               /* 操作成功 */
+//     BOARD_ERR_INVALID_PARAM = 0x01U,/* 非法参数或空指针 */
+//     BOARD_ERR_HW_TIMEOUT = 0x02U    /* 硬件响应超时 */
+// } Board_Status_t;
+
+// /* ============================================================================ */
+// /* 2. 板级初始化对外 API 声明                                                   */
+// /* ============================================================================ */
+Sys_Status_t BSP_Init(void);
+// void System_Core_Init(void);
+// Board_Status_t Board_Init(void);
+// Board_Status_t Board_Gpio_Init(void);
+// Board_Status_t Board_Uart_Init(void);
 
 #ifdef __cplusplus
 }
