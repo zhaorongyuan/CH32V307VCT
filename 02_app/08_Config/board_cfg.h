@@ -1,5 +1,5 @@
 /**
- * @file    board_pin.h
+ * @file    board_cfg.h
  * @brief   硬件-软件接口 (HSI) 完备引脚映射定义头文件
  * @details 对应硬件系统板级引脚分配表 (完全展开版，包含全部 58 个引脚定义)。
  *          符合 DO-178C HSI Data 规范 (DO-178C Section 11.13)。
@@ -12,8 +12,8 @@
  * @copyright (c) 2026 zry. All rights reserved.
  */
 
-#ifndef BOARD_PIN_H
-#define BOARD_PIN_H
+#ifndef __BOARD_CFG_H
+#define __BOARD_CFG_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -307,4 +307,4 @@ extern "C" {
 }
 #endif
 
-#endif /* BOARD_PIN_H */
+#endif /* __BOARD_CFG_H */

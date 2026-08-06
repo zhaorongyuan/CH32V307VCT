@@ -1,12 +1,12 @@
 /**
- * @file    board_gpio_cfg.h
- * @brief   GPIO 外设抽象配置描述头文件（数据驱动模式）
- * @details 定义离散量基础 GPIO 的数据驱动抽象结构体与配置项。
- * @author  zry
- * @date    2026-07-30
- * @version V0.0.1
+ * @file board_gpio_cfg.h
+ * @brief Discrete GPIO Configuration Data Structure and Logical Channel Definitions
+ * @details Fully defines logical GPIO IDs, table structure, and read-only configuration interfaces.
+ * @author zry
+ * @date 2026-08-06
+ * @version V1.0.0
  *
- * @note    System HLR Traceability: [REQ-HLR-BSP-002]
+ * @note System HLR Traceability: [REQ-HLR-BSP-002]
  * @copyright (c) 2026 zry. All rights reserved.
  */
 
@@ -20,17 +20,32 @@ extern "C" {
 #include "ch32v30x.h"
 
 /**
- * @brief 单个/组 GPIO 引脚初始化配置描述结构体
+ * @brief Logical Discrete GPIO Output Channel Enumeration
+ * @details Used for safety-critical per-channel control and fault reporting.
+ */
+typedef enum {
+    BOARD_GPIO_OUT_LED1 = 0U,       /* LED1 Indicator (Active Low / Default High) */
+    BOARD_GPIO_OUT_LED2,            /* LED2 Indicator (Active Low / Default High) */
+    BOARD_GPIO_OUT_AUDIO_CTL,       /* Audio Control Pin (Play Mode) */
+    BOARD_GPIO_OUT_BLE_AT,          /* Bluetooth AT Command Mode Pin */
+    BOARD_GPIO_OUT_BLE_SLEEP,       /* Bluetooth Sleep Mode Pin */
+    BOARD_GPIO_OUT_LCD_BL,          /* LCD Backlight Control (Active High) */
+    BOARD_GPIO_OUT_MAX_COUNT
+} Board_GPIO_OutChannel_t;
+
+/**
+ * @brief GPIO Pin Configuration Structure (Stored in Flash / Read-Only Section)
  */
 typedef struct {
-    GPIO_TypeDef*      pPort;            /* GPIO 端口基地址 */
-    uint16_t           usPin;            /* GPIO 引脚掩码 */
-    GPIOMode_TypeDef   eMode;            /* 输入/输出模式 */
-    GPIOSpeed_TypeDef  eSpeed;           /* 输出翻转速率 */
-    BitAction          eInitialState;    /* 初始安全电平状态 */
-    uint8_t            ucApplyInitState; /* 1: 配置模式前强置初始电平; 0: 不设置 */
+    GPIO_TypeDef*      pPort;            /* Physical GPIO Port Base Address */
+    uint16_t           usPin;            /* Physical GPIO Pin Mask */
+    GPIOMode_TypeDef   eMode;            /* Pin Mode (Out_PP, IPU, IPD, etc.) */
+    GPIOSpeed_TypeDef  eSpeed;           /* Output Slew Rate */
+    BitAction          eInitialState;    /* Pre-latch Safe State (Bit_SET / Bit_RESET) */
+    uint8_t            ucApplyInitState; /* 1: Latch state before init + Read-back verify; 0: Pure input */
 } Board_GPIO_Config_t;
 
+/* Global Read-Only Configuration Table References */
 extern const Board_GPIO_Config_t g_GpioConfigTable[];
 extern const uint8_t g_GpioConfigTableSize;
 

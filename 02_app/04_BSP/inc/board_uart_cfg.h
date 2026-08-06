@@ -1,12 +1,13 @@
 /**
- * @file    board_uart_cfg.h
- * @brief   UART 通信接口参数配置头文件（纯数据与结构定义）
- * @details 包含 UART1, UART2, WiFi(UART6), BLE(UART7) 物理引脚与协议参数数据描述。
- * @author  zry
- * @date    2026-07-30
- * @version V0.0.1
+ * @file board_uart_cfg.h
+ * @brief Master UART Hardware Configuration Interface (Data-Driven Pattern)
+ * @details Fully describes physical pins, peripheral register bases, DMA channels,
+ *          and PFIC interrupt vectors for high-integrity UART interfaces.
+ * @author zry
+ * @date 2026-08-06
+ * @version V1.0.0
  *
- * @note    System HLR Traceability: [REQ-HLR-BSP-003]
+ * @note System HLR Traceability: [REQ-HLR-BSP-003]
  * @copyright (c) 2026 zry. All rights reserved.
  */
 
@@ -20,36 +21,58 @@ extern "C" {
 #include "ch32v30x.h"
 
 /**
- * @brief 串口逻辑通道枚举
+ * @brief Peripheral Bus Identification Enumeration
  */
 typedef enum {
-    UART_ID_DEBUG1 = 0U,    /* USART1 - 主调试串口 (PA9/PA10) */
-    UART_ID_DEBUG2,         /* USART2 - 跳线调试串口 (PA2/PA3) */
-    UART_ID_WIFI,           /* UART6  - ESP8266 WiFi (PC0/PC1) */
-    UART_ID_BLE,            /* UART7  - CH9141 蓝牙 (PC2/PC3) */
+    BOARD_BUS_APB1 = 0U,
+    BOARD_BUS_APB2 = 1U
+} Board_BusType_t;
+
+/**
+ * @brief Logical UART Channel Enumeration ID
+ */
+typedef enum {
+    UART_ID_DEBUG1 = 0U,    /* USART1 - Master Debug Serial (PA9/PA10) */
+    UART_ID_DEBUG2,         /* USART2 - Jumper Debug Serial (PA2/PA3) */
+    UART_ID_WIFI,           /* UART6  - ESP8266 WiFi Module (PC0/PC1) */
+    UART_ID_BLE,            /* UART7  - CH9141 Bluetooth Module (PC2/PC3) */
     UART_ID_MAX
 } UART_ID_t;
 
 /**
- * @brief 串口数据驱动完备描述结构体（解耦包含硬件物理引脚）
+ * @brief High-Integrity Data-Driven UART Driver Configuration Structure
  */
 typedef struct {
-    USART_TypeDef*      pInstance;      /* 串口寄存器基地址 */
-    uint32_t            ulClockMask;    /* 时钟使能掩码 */
-    uint32_t            ulBaudRate;     /* 波特率 */
-    uint16_t            usWordLength;   /* 数据位 */
-    uint16_t            usStopBits;     /* 停止位 */
-    uint16_t            usParity;       /* 校验位 */
-    uint16_t            usHwFlowCtl;    /* 流控 */
-    uint8_t             ucIsAPB2;       /* 1: APB2 总线; 0: APB1 总线 */
+    /* 1. Controller Base Address & Clocking */
+    USART_TypeDef*         pInstance;          /* Hardware Register Base Address */
+    Board_BusType_t        eBusType;           /* Peripheral Bus Assignment (APB1 / APB2) */
+    uint32_t               ulUartClockMask;    /* Peripheral Clock Enable Mask */
     
-    /* 物理引脚解耦映射 (来自 board_pin.h) */
-    GPIO_TypeDef*       pTxPort;        /* TX 引脚端口 */
-    uint16_t            usTxPin;        /* TX 引脚掩码 */
-    GPIO_TypeDef*       pRxPort;        /* RX 引脚端口 */
-    uint16_t            usRxPin;        /* RX 引脚掩码 */
+    /* 2. Communication Line Parameters */
+    uint32_t               ulBaudRate;         /* Baud Rate (e.g., 115200) */
+    uint16_t               usWordLength;       /* Data Bits (8b/9b) */
+    uint16_t               usStopBits;         /* Stop Bits (1 / 1.5 / 2) */
+    uint16_t               usParity;           /* Parity Check (None / Even / Odd) */
+    uint16_t               usHwFlowCtl;        /* Hardware Flow Control (None / RTS_CTS) */
+
+    /* 3. Decoupled Physical Pin Mapping */
+    GPIO_TypeDef*          pTxPort;            /* TX GPIO Port Base */
+    uint16_t               usTxPin;            /* TX Pin Mask */
+    GPIO_TypeDef*          pRxPort;            /* RX GPIO Port Base */
+    uint16_t               usRxPin;            /* RX Pin Mask */
+
+    /* 4. DMA Subsystem Configuration (DAL-A/B Requirement) */
+    DMA_Channel_TypeDef*   pDmaTxChannel;      /* DMA TX Stream/Channel Base */
+    DMA_Channel_TypeDef*   pDmaRxChannel;      /* DMA RX Stream/Channel Base */
+    uint32_t               ulDmaClockMask;     /* DMA Controller Clock Mask */
+
+    /* 5. PFIC Interrupt Vector Configuration */
+    IRQn_Type              eIrqNumber;         /* Interrupt Vector ID */
+    uint8_t                ucIrqPreemptPri;    /* Preemption Priority */
+    uint8_t                ucIrqSubPri;        /* Sub Priority */
 } UART_Config_t;
 
+/* Global Read-Only Flash Table Export */
 extern const UART_Config_t g_UartConfigTable[UART_ID_MAX];
 
 #ifdef __cplusplus

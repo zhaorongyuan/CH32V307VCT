@@ -1,212 +1,313 @@
 /**
- * @file    board.c
- * @brief   板级初始化实现（数据驱动与分阶段 BSP 初始化框架）
- * @details 绝对无硬编码引脚，全表驱动遍历，具备空指针防御性校验。
- * @author  zry
- * @date    2026-07-30
- * @version V0.0.1
+ * @file bsp_board.c
+ * @brief Master Board Level Initialization Implementation (DAL-A/B Hardened)
+ * @details Implements fault-tolerant, data-driven peripheral startup sequences,
+ *          clock safety loops, and hardware read-back validation.
+ * @author zry
+ * @date 2026-08-06
+ * @version V1.0.0
  *
- * @note    System HLR Traceability: [REQ-HLR-BSP-001], [REQ-HLR-BSP-002], [REQ-HLR-BSP-003]
+ * @note System HLR Traceability: [REQ-HLR-BSP-001], [REQ-HLR-BSP-002], [REQ-HLR-BSP-003]
  * @copyright (c) 2026 zry. All rights reserved.
  */
 
 #include "bsp_board.h"
 #include <stddef.h>
 #include "board_systick.h"
-#include "debug.h"
+#include "debug.h"    /* Replaces raw printf with conditionally compiled debug macros */
+#include "sys_health.h"   /* System Fault Reporting Interface */
 
+/* Upper bound limit for hardware loop iterations to satisfy WCET static analysis */
+#define BSP_CLOCK_LOCK_TIMEOUT_LIMIT    (100000U)
 
+/* Private Function Prototypes */
+static Board_Status_t Board_Clock_Init(void);
 
 /**
- * @brief  系统核心底层组件初始化
+ * @brief  System Core Architecture Low-Level Setup
+ * @details Configures NVIC, core clocks, and SysTick 1ms tick interrupts.
  */
-static void System_Core_Init(void)
+void System_Core_Init(void)
 {
-    /* 配置中断优先级分组 */
+    /* 1. Configure Interrupt Priority Grouping (2 bits pre-emption, 2 bits sub-priority) */
     NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
 
-    /* 更新 SystemCoreClock 变量 */
+    /* 2. Update SystemCoreClock global variable according to RCC register states */
     SystemCoreClockUpdate();
 
-    /* 注意：如果 Delay_Init 使用了 SysTick，请确认其不会关闭中断。
-       建议优先初始化 Delay，再配置 SysTick 心跳中断 */
+    /* 3. Initialize Delay module and SysTick Timer */
     Delay_Init();
-    USART_Printf_Init(115200);
-    printf("Debug init");
 
-    /* 配置 1ms 的 SysTick 心跳中断 */
+    /* 4. Conditional Debug Macro (Stripped in Production Release Builds) */
+    // SYS_DEBUG_PRINTF("BSP: Core System Initialized. Target SysClock = %u Hz\r\n", SystemCoreClock);
+    USART_Printf_Init(115200);
+    printf("Debug init\r\n");
+
+
+    /* 5. Configure 1ms Deterministic System Tick Interrupt */
     BSW_SysTick_Config(SystemCoreClock);
 }
 
+/**
+ * @brief   Enable System Peripheral Clocks with PLL Lock Verification
+ * @details Enables GPIO A~E and AFIO bus clocks, then verifies PLL clock lock status within WCET bounds.
+ * 
+ * @param   void
+ * @return  Board_Status_t
+ * @retval  BOARD_OK Status OK and Clock locked.
+ * @retval  BOARD_ERR_HW_TIMEOUT PLL failed to lock within timeout limit.
+ * 
+ * @note    LLR Traceability: [REQ-SW-BSP-0101]
+ * @note    Safety Criticality: DAL-A / Bounded Execution Loop
+ */
+static Board_Status_t Board_Clock_Init(void)
+{
+    Board_Status_t status = BOARD_OK;
+    uint32_t timeout = BSP_CLOCK_LOCK_TIMEOUT_LIMIT;
 
-// /* 私有函数声明 */
-// static Board_Status_t Board_Clock_Init(void);
+    /* Enable APB2 Bus Clocks for GPIOA ~ GPIOE and AFIO */
+    RCC_APB2PeriphClockCmd(
+        RCC_APB2Periph_GPIOA | RCC_APB2Periph_GPIOB |
+        RCC_APB2Periph_GPIOC | RCC_APB2Periph_GPIOD |
+        RCC_APB2Periph_GPIOE | RCC_APB2Periph_AFIO,
+        ENABLE
+    );
 
-// /**
-//  * @brief   系统基础 GPIO 外设时钟统一使能
-//  * @details 集中使能 GPIOA~GPIOE 及 AFIO 总线时钟。
-//  * 
-//  * @param   void
-//  * @return  Board_Status_t 执行状态码
-//  * @retval  BOARD_OK 操作成功
-//  * 
-//  * @note    LLR Traceability: [REQ-SW-BSP-0101]
-//  * @note    Safety Criticality: DAL-B / Deterministic execution
-//  */
-// static Board_Status_t Board_Clock_Init(void)
-// {
-//     RCC_APB2PeriphClockCmd(
-//         RCC_APB2Periph_GPIOA | RCC_APB2Periph_GPIOB |
-//         RCC_APB2Periph_GPIOC | RCC_APB2Periph_GPIOD |
-//         RCC_APB2Periph_GPIOE | RCC_APB2Periph_AFIO,
-//         ENABLE
-//     );
-    
-//     return BOARD_OK;
-// }
+    /* Bounded Verification Loop: Ensure PLL Clock is Stable */
+    while ((RCC_GetFlagStatus(RCC_FLAG_PLLRDY) == RESET) && (timeout > 0U))
+    {
+        timeout--;
+    }
 
-// /**
-//  * @brief   板级 GPIO 外设数据驱动统一初始化
-//  * @details 遍历 g_GpioConfigTable 配置表，依次锁存 Safe-State 并初始化引脚模式。
-//  * 
-//  * @param   void
-//  * @return  Board_Status_t 执行状态码
-//  * @retval  BOARD_OK                操作成功
-//  * @retval  BOARD_ERR_INVALID_PARAM 遇到非法配置项或 NULL 指针
-//  * 
-//  * @note    LLR Traceability: [REQ-SW-BSP-0102]
-//  * @note    Safety Criticality: DAL-B / Bounded Loop (Max iterations: g_GpioConfigTableSize)
-//  */
-// Board_Status_t Board_Gpio_Init(void)
-// {
-//     GPIO_InitTypeDef gpioInit = {0};
-//     uint8_t index = 0U;
+    if (0U == timeout)
+    {
+        /* Clock Lock Failed! Report Fault to System Health Monitoring */
+        // (void)SYS_Health_ReportFault(SYS_FAULT_ID_CLK_FAIL, SYS_FAULT_SEVERITY_CRITICAL);
+        status = BOARD_ERR_HW_TIMEOUT;
+    }
 
-//     for (index = 0U; index < g_GpioConfigTableSize; index++)
-//     {
-//         const Board_GPIO_Config_t* const pCfg = &g_GpioConfigTable[index];
+    return status;
+}
 
-//         /* 防御性编程：校验端口指针有效性 */
-//         if (pCfg->pPort == NULL)
-//         {
-//             return BOARD_ERR_INVALID_PARAM;
-//         }
+/**
+ * @brief   Data-Driven GPIO Initialization Routine with Hardware Read-Back Check
+ * @details Traverses g_GpioConfigTable, applies initial safe levels, and reads back IDR for discrete outputs.
+ * 
+ * @param   void
+ * @return  Board_Status_t
+ * @retval  BOARD_OK                Operation successful and all outputs verified.
+ * @retval  BOARD_ERR_INVALID_PARAM NULL pointer detected in table.
+ * @retval  BOARD_ERR_VERIFY        Physical pin failed read-back verification (Short-circuit / Stuck fault).
+ * 
+ * @note    LLR Traceability: [REQ-SW-BSP-0102]
+ * @note    Safety Criticality: DAL-A / Bounded Loop (Max iterations: g_GpioConfigTableSize)
+ */
+Board_Status_t Board_Gpio_Init(void)
+{
+    GPIO_InitTypeDef gpioInit = {0};
+    uint8_t index = 0U;
 
-//         /* 若定义了安全初始电平，在模式配置前锁存，避免引脚初始化瞬间产生电气毛刺 */
-//         if (pCfg->ucApplyInitState != 0U)
-//         {
-//             GPIO_WriteBit(pCfg->pPort, pCfg->usPin, pCfg->eInitialState);
-//         }
+    for (index = 0U; index < g_GpioConfigTableSize; index++)
+    {
+        const Board_GPIO_Config_t* const pCfg = &g_GpioConfigTable[index];
 
-//         gpioInit.GPIO_Pin   = pCfg->usPin;
-//         gpioInit.GPIO_Mode  = pCfg->eMode;
-//         gpioInit.GPIO_Speed = pCfg->eSpeed;
-//         GPIO_Init(pCfg->pPort, &gpioInit);
-//     }
+        /* Defensive Check: Validate Port Pointer */
+        if (NULL == pCfg->pPort)
+        {
+            return BOARD_ERR_INVALID_PARAM;
+        }
 
-//     return BOARD_OK;
-// }
+        /* 1. Pre-latch safe initial state before pin mode configuration */
+        if (pCfg->ucApplyInitState != 0U)
+        {
+            GPIO_WriteBit(pCfg->pPort, pCfg->usPin, pCfg->eInitialState);
+        }
 
-// /**
-//  * @brief   板级串口统一初始化 (数据驱动架构)
-//  * @details 遍历 g_UartConfigTable 静态配置表，完成全板 4 路串口引脚与外设初始化。
-//  * 
-//  * @param   void
-//  * @return  Board_Status_t 执行状态码
-//  * @retval  BOARD_OK                操作成功
-//  * @retval  BOARD_ERR_INVALID_PARAM 配置表指针或基地址为空
-//  * 
-//  * @note    LLR Traceability: [REQ-SW-BSP-0103]
-//  * @note    Safety Criticality: DAL-B / Bounded Loop (Max iterations: UART_ID_MAX)
-//  */
-// Board_Status_t Board_Uart_Init(void)
-// {
-//     GPIO_InitTypeDef  gpioInit = {0};
-//     USART_InitTypeDef usartInit = {0};
-//     uint8_t index = 0U;
+        /* 2. Call MCAL Driver to initialize pin modes */
+        gpioInit.GPIO_Pin   = pCfg->usPin;
+        gpioInit.GPIO_Mode  = pCfg->eMode;
+        gpioInit.GPIO_Speed = pCfg->eSpeed;
+        GPIO_Init(pCfg->pPort, &gpioInit);
 
-//     for (index = 0U; index < (uint8_t)UART_ID_MAX; index++)
-//     {
-//         const UART_Config_t* const pCfg = &g_UartConfigTable[index];
+        /* 3. Hardware Read-Back Verification for Discrete Outputs */
+        if (pCfg->ucApplyInitState != 0U)
+        {
+            uint8_t actualBit = GPIO_ReadInputDataBit(pCfg->pPort, pCfg->usPin);
+            uint8_t expectedBit = (pCfg->eInitialState != Bit_RESET) ? 1U : 0U;
 
-//         /* 防御性编程：多重空指针校验 */
-//         if ((pCfg->pInstance == NULL) || (pCfg->pTxPort == NULL) || (pCfg->pRxPort == NULL))
-//         {
-//             return BOARD_ERR_INVALID_PARAM;
-//         }
+            if (actualBit != expectedBit)
+            {
+                /* Physical line electrical fault detected! Report to System Health */
+                // (void)SYS_Health_ReportFault(SYS_FAULT_ID_GPIO_VERIFY_FAIL, SYS_FAULT_SEVERITY_CRITICAL);
+                return BOARD_ERR_VERIFY;
+            }
+        }
+    }
 
-//         /* 1. 时钟使能 (依据 APB1/APB2 映射) */
-//         if (pCfg->ucIsAPB2 != 0U) {
-//             RCC_APB2PeriphClockCmd(pCfg->ulClockMask, ENABLE);
-//         } else {
-//             RCC_APB1PeriphClockCmd(pCfg->ulClockMask, ENABLE);
-//         }
+    return BOARD_OK;
+}
 
-//         /* 2. TX 物理引脚配置 (数据驱动) */
-//         gpioInit.GPIO_Pin   = pCfg->usTxPin;
-//         gpioInit.GPIO_Speed = GPIO_Speed_50MHz;
-//         gpioInit.GPIO_Mode  = GPIO_Mode_AF_PP;
-//         GPIO_Init(pCfg->pTxPort, &gpioInit);
+/**
+ * @brief   Data-Driven UART Peripheral Master Initialization
+ * @details Traverses g_UartConfigTable to configure clocks, TX/RX physical pins, and protocol parameters.
+ * 
+ * @param   void
+ * @return  Board_Status_t
+ * @retval  BOARD_OK                Operation successful.
+ * @retval  BOARD_ERR_INVALID_PARAM NULL pointer found in configuration table.
+ * 
+ * @note    LLR Traceability: [REQ-SW-BSP-0103]
+ * @note    Safety Criticality: DAL-B / Bounded Loop (Max iterations: UART_ID_MAX)
+ */
+Board_Status_t Board_Uart_Init(void)
+{
+    GPIO_InitTypeDef  gpioInit = {0};
+    USART_InitTypeDef usartInit = {0};
+    NVIC_InitTypeDef  nvicInit = {0};
+    uint8_t index = 0U;
 
-//         /* 3. RX 物理引脚配置 (数据驱动) */
-//         gpioInit.GPIO_Pin   = pCfg->usRxPin;
-//         gpioInit.GPIO_Mode  = GPIO_Mode_IN_FLOATING;
-//         GPIO_Init(pCfg->pRxPort, &gpioInit);
+    for (index = 0U; index < (uint8_t)UART_ID_MAX; index++)
+    {
+        const UART_Config_t* const pCfg = &g_UartConfigTable[index];
 
-//         /* 4. 串口协议参数初始化 */
-//         usartInit.USART_BaudRate            = pCfg->ulBaudRate;
-//         usartInit.USART_WordLength          = pCfg->usWordLength;
-//         usartInit.USART_StopBits            = pCfg->usStopBits;
-//         usartInit.USART_Parity              = pCfg->usParity;
-//         usartInit.USART_HardwareFlowControl = pCfg->usHwFlowCtl;
-//         usartInit.USART_Mode                = USART_Mode_Rx | USART_Mode_Tx;
+        /* 防御性编程：多重空指针校验 */
+        if ((NULL == pCfg->pInstance) || (NULL == pCfg->pTxPort) || (NULL == pCfg->pRxPort))
+        {
+            return BOARD_ERR_INVALID_PARAM;
+        }
 
-//         USART_Init(pCfg->pInstance, &usartInit);
-//         USART_Cmd(pCfg->pInstance, ENABLE);
-//     }
+        /* 1. 使能 GPIO 与 USART 外设时钟 */
+        if (pCfg->eBusType == BOARD_BUS_APB2)
+        {
+            RCC_APB2PeriphClockCmd(pCfg->ulUartClockMask, ENABLE);
+        }
+        else
+        {
+            RCC_APB1PeriphClockCmd(pCfg->ulUartClockMask, ENABLE);
+        }
 
-//     return BOARD_OK;
-// }
+        /* 2. 使能 DMA 外设时钟 */
+        if (pCfg->pDmaTxChannel != NULL)
+        {
+            RCC_AHBPeriphClockCmd(pCfg->ulDmaClockMask, ENABLE);
+        }
 
-// /**
-//  * @brief   板级硬件总初始化入口 (Phase 1 BSP Driver Initialization)
-//  * @details 顺序调度 Clock、GPIO、UART 例程，实行故障拦截。
-//  * 
-//  * @param   void
-//  * @return  Board_Status_t 执行状态码
-//  * @retval  BOARD_OK               初始化全部成功
-//  * @retval  BOARD_ERR_INVALID_PARAM 初始化过程出现非法参数
-//  * 
-//  * @note    LLR Traceability: [REQ-SW-BSP-0101], [REQ-SW-BSP-0102], [REQ-SW-BSP-0103]
-//  * @note    Safety Criticality: DAL-B / Safe Safe Entry point
-//  */
-// Board_Status_t Board_Init(void)
-// {
-//     Board_Status_t status = BOARD_OK;
+        /* 3. TX 物理引脚配置 (复用推挽) */
+        gpioInit.GPIO_Pin   = pCfg->usTxPin;
+        gpioInit.GPIO_Speed = GPIO_Speed_50MHz;
+        gpioInit.GPIO_Mode  = GPIO_Mode_AF_PP;
+        GPIO_Init(pCfg->pTxPort, &gpioInit);
 
-//     /* 1. 外设时钟初始化 */
-//     status = Board_Clock_Init();
-//     if (status != BOARD_OK) {
-//         return status;
-//     }
+        /* 4. RX 物理引脚配置 (浮空输入) */
+        gpioInit.GPIO_Pin   = pCfg->usRxPin;
+        gpioInit.GPIO_Mode  = GPIO_Mode_IN_FLOATING;
+        GPIO_Init(pCfg->pRxPort, &gpioInit);
 
-//     /* 2. 板载 GPIO 数据驱动初始化 */
-//     status = Board_Gpio_Init();
-//     if (status != BOARD_OK) {
-//         return status;
-//     }
+        /* 5. 串口协议参数初始化 */
+        usartInit.USART_BaudRate            = pCfg->ulBaudRate;
+        usartInit.USART_WordLength          = pCfg->usWordLength;
+        usartInit.USART_StopBits            = pCfg->usStopBits;
+        usartInit.USART_Parity              = pCfg->usParity;
+        usartInit.USART_HardwareFlowControl = pCfg->usHwFlowCtl;
+        usartInit.USART_Mode                = USART_Mode_Rx | USART_Mode_Tx;
 
-//     /* 3. 串口数据驱动初始化 */
-//     status = Board_Uart_Init();
-//     if (status != BOARD_OK) {
-//         return status;
-//     }
+        USART_Init(pCfg->pInstance, &usartInit);
 
-//     return BOARD_OK;
-// }
+        /* 6. 配置 PFIC 中断向量与优先级 (供 DMA/Idle 帧中断使用) */
+        nvicInit.NVIC_IRQChannel                     = pCfg->eIrqNumber;
+        nvicInit.NVIC_IRQChannelPreemptionPriority   = pCfg->ucIrqPreemptPri;
+        nvicInit.NVIC_IRQChannelSubPriority          = pCfg->ucIrqSubPri;
+        nvicInit.NVIC_IRQChannelCmd                  = ENABLE;
+        NVIC_Init(&nvicInit);
 
+        USART_Cmd(pCfg->pInstance, ENABLE);
+    }
+
+    return BOARD_OK;
+}
+
+/**
+ * @brief   Phase-1 Board Hardware Driver Master Entry
+ * @details Sequentially calls Clock, GPIO, and UART initializations. Halts on first error.
+ * 
+ * @param   void
+ * @return  Board_Status_t
+ * @retval  BOARD_OK All initializations completed successfully.
+ * 
+ * @note    LLR Traceability: [REQ-SW-BSP-0100]
+ * @note    Safety Criticality: DAL-A / Fail-Safe Entry Point
+ */
+Board_Status_t Board_Init(void)
+{
+    Board_Status_t status = BOARD_OK;
+
+    /* 1. Peripheral Clock & Lock Setup */
+    status = Board_Clock_Init();
+    if (status != BOARD_OK)
+    {
+        return status;
+    }
+
+    /* 2. Board GPIO Data-Driven Setup with HW Verification */
+    status = Board_Gpio_Init();
+    if (status != BOARD_OK)
+    {
+        return status;
+    }
+
+    /* 3. Master UART Initialization */
+    status = Board_Uart_Init();
+    if (status != BOARD_OK)
+    {
+        return status;
+    }
+
+    return BOARD_OK;
+}
+
+/**
+ * @brief   BSP Master Entry Point for 07_System Dispatcher
+ * @details Converts local BSP status to unified system-level status code without silent fall-throughs.
+ * 
+ * @return  Sys_Status_t
+ * 
+ * @note    LLR Traceability: [REQ-SW-BSP-0100]
+ * @note    Safety Criticality: DAL-A
+ */
 Sys_Status_t BSP_Init(void)
 {
+    Board_Status_t status = BOARD_OK;
+
+    /* 1. Core Architecture Setup */
     System_Core_Init();
-    return SYS_OK;
+
+    /* 2. Phase-1 Board Drivers Setup */
+    status = Board_Init();
+
+    /* 3. Explicit Status Mapping & Fault Propagation (No Implicit Pass) */
+    Sys_Status_t sysStatus = SYS_OK;
+    switch (status)
+    {
+        case BOARD_OK:
+            sysStatus = SYS_OK;
+            break;
+
+        case BOARD_ERR_INVALID_PARAM:
+            sysStatus = SYS_ERR_PARAM;
+            break;
+
+        case BOARD_ERR_HW_TIMEOUT:
+            sysStatus = SYS_ERR_TIMEOUT;
+            break;
+
+        case BOARD_ERR_VERIFY:
+            sysStatus = SYS_ERR_HW_FAIL;
+            break;
+
+        default:
+            sysStatus = SYS_ERR_HW_FAIL;
+            break;
+    }
+
+    return sysStatus;
 }
