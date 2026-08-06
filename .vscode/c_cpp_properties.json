@@ -1,0 +1,27 @@
+{
+    "configurations": [
+        {
+            "name": "CH32V307",
+            "includePath": [
+                "${workspaceFolder}/02_app/03_MCAL/inc",
+                "${workspaceFolder}/02_app/04_BSP/inc",
+                "${workspaceFolder}/02_app/05_Middleware/RTE",
+                "${workspaceFolder}/02_app/05_Middleware/PDI",
+                "${workspaceFolder}/02_app/06_APP",
+                "${workspaceFolder}/02_app/07_System",
+                "${workspaceFolder}/02_app/08_Config",
+                "${workspaceFolder}/02_app/09_TEST",
+                "${workspaceFolder}/02_app/01_Build"
+            ],
+            "defines": [
+                "CH32V307",
+                "USE_STDPERIPH_DRIVER"
+            ],
+            "compilerPath": "",
+            "cStandard": "c11",
+            "cppStandard": "c++11",
+            "intelliSenseMode": "gcc-x64"
+        }
+    ],
+    "version": 4
+}
