@@ -8,75 +8,86 @@
 
 ```
 app/
-├── 00_Doc/                  # [文档域] DO-178C 适航认证体系文档
-│   ├── ICD/                 # 接口控制文档 (Interface Control Document)
-│   ├── Traceability/        # 双向追溯表 (System REQ <-> HLR <-> LLR <-> Code <-> Test Case)
-│   └── Safety/              # FMEA / FHA / Hazard Log (危险源与失效模式分析)
+├── 00_Doc/                  # [文档域] DO-178C 适航认证生命周期过程文档体系
+│   ├── Certification/       # 适航计划文档 (PSAC, SDP, SVP, SQAP, SCMP)
+│   ├── ICD/                 # 接口控制文档 (Hardware, Software, Communication Protocols)
+│   ├── Traceability/        # 双向追溯矩阵 (SysREQ <-> HLR <-> LLR <-> Code <-> Test Case)
+│   └── Safety/              # 针对系统安全分析的衍生需求 (FHA, PASA, FMEA, FMEDA, Hazard Log)
 │
-├── 01_Build/                # [构建域] 编译控制与内存分区映射
-│   ├── Link.ld              # RISC-V 链接脚本 (映射 Boot/APP Dual-Bank, ISR Vector, Stack Guard Page)
-│   └── toolchain.cmake      # 编译器选项 (开启 MISRA-C 警告、禁用隐式转换、优化级别固定)
+├── 01_Build/                # [构建域] 编译控制、静态分析规范与内存分区映射
+│   ├── Link.ld              # RISC-V 链接脚本 (Dual-Bank Flash, ISR Vector, Stack Guard, DTCM/ITCM)
+│   ├── toolchain.cmake      # CMake 编译工具链 (固定警告级别, 禁用隐式转换, 强制 WCET 导出)
+│   └── static_analysis/     # MISRA-C:2012 & CERT-C 静态检查规则集与偏差说明 (Deviations)
 │
-├── 02_Core/                 # [Core 域] CPU 内核级启动与 CSR 寄存器控制 (QingKe V4F)
-│   ├── startup_ch32v30x_D8C.S # 汇编启动文件 (向量表注册、Stack/Heap 指针初始化)
-│   ├── core_riscv.c         # RISC-V 架构 API (PFIC 中断控制器、SysTick、CSR 读写)
-│   └── core_riscv.h         # 内核底层寄存器映射
+├── 02_Core/                 # [Core 域] RISC-V (QingKe V4F) 内核启动与底层控制
+│   ├── startup_ch32v30x_D8C.S # 汇编启动文件 (中断向量表表项映射、HW FPU 上下文初始化、Stack 初始化)
+│   ├── core_riscv.c         # RISC-V 架构 API (PFIC 中断控制器配置、SysTick 驱动、CSR 读写封装)
+│   └── core_riscv.h         # 内核底层寄存器映射 (mstatus, mepc, mcause, mtvec, pmp)
 │
-├── 03_MCAL/                 # [MCAL 域] 芯片厂商外设标准库 (零修改 Vendor Library)
-│   ├── inc/                 # ch32v30x_adc.h, ch32v30x_gpio.h, ch32v30x_usart.h...
-│   └── src/                 # ch32v30x_adc.c, ch32v30x_gpio.c, ch32v30x_usart.c...
+├── 03_MCAL/                 # [MCAL 域] 芯片厂商底层外设标准库 (零修改 Vendor Read-Only Library)
+│   ├── inc/                 # ch32v30x_adc.h, ch32v30x_gpio.h, ch32v30x_usart.h, ch32v30x_flash.h...
+│   └── src/                 # ch32v30x_adc.c, ch32v30x_gpio.c, ch32v30x_usart.c, ch32v30x_flash.c...
 │
-├── 04_BSP/                  # [BSP 域] 板级支持包 (硬件相关，业务无关，只被 System/Middleware 调用)
+├── 04_BSP/                  # [BSP 域] 板级支持包 (硬件相关驱动，对外暴露统一防错 API)
 │   ├── inc/
-│   │   ├── bsp_board.h      # 板级总初始化入口 (BSP_Board_Init)
-│   │   ├── bsp_gpio.h       # 板级 GPIO 抽象驱动 (LED, Switch, Relay)
-│   │   ├── bsp_uart.h       # 串口 DMA + Safe RingBuffer 收发驱动
-│   │   ├── bsp_flash.h      # 内部 Flash 擦写/读取安全封装 (带 Timeout & Boundary Check)
-│   │   └── bsp_adc.h        # 模拟量采集抽象驱动 (电流、电压、温度 AD 原生值)
+│   │   ├── bsp_board.h      # 板级上电自检 (POST) 与总初始化入口 (BSP_Board_Init)
+│   │   ├── bsp_gpio.h       # 离散 IO、继电器及指示灯安全抽象 (带状态读回校验)
+│   │   ├── bsp_uart.h       # 串口 DMA + 环形缓冲区 (硬件 Overrun / Parity 故障隔离)
+│   │   ├── bsp_flash.h      # 内部 Flash 读写安全封装 (带 Dual-Bank 擦写锁、超时校验与 ECC)
+│   │   ├── bsp_adc.h        # 多路 ADC 采样抽象驱动 (含 DMA 双缓冲区与 HW 超时监控)
+│   │   └── bsp_wdg.h        # 看门狗底层驱动 (窗口看门狗 WWDG / 独立看门狗 IWDG 硬件触发)
 │   └── src/
 │       ├── bsp_board.c
 │       ├── bsp_gpio.c
 │       ├── bsp_uart.c
 │       ├── bsp_flash.c
-│       └── bsp_adc.c
+│       ├── bsp_adc.c
+│       └── bsp_wdg.c
 │
-├── 05_Middleware/           # [中间件域] 纯逻辑服务层 (纯 C 编写，硬件完全无关，支持 PC 端 100% MC/DC 测试)
+├── 05_Middleware/           # [中间件域] 硬件无关纯逻辑服务层 (支持 Host PC 100% MC/DC 白盒测试)
 │   ├── PDI/                 # 协议数据接口 (Protocol Data Interface)
-│   │   ├── pdi_def.h        # PDI 帧头/尾、Command ID、状态码
-│   │   ├── pdi_mgr.h        # 解包/组包/CRC 校验状态机 API
+│   │   ├── pdi_def.h        # 帧结构、Command ID、网络状态码与校验算法宏
+│   │   ├── pdi_mgr.h        # 报文解包/组包状态机 API (流式状态机，防缓冲区溢出)
 │   │   ├── pdi_mgr.c
-│   │   └── pdi_default.c    # 异常应答与 Ack/Nack 生成
-│   ├── OTA/                 # 固件升级中间件
-│   │   ├── ota_mgr.h        # Flash Dual-Bank 镜像 Header 校验、Boot 标记管理
+│   │   ├── pdi_default.h    # 异常应答与 Ack/Nack 模版响应生成器
+│   │   └── pdi_default.c
+│   ├── OTA/                 # 固件在线升级中间件
+│   │   ├── ota_mgr.h        # Dual-Bank 镜像 Header 校验 (RSA/CRC32)、防倒滚计数器、Boot 标志管理
 │   │   └── ota_mgr.c
-│   └── RTE/                 # [重构承接] 运行时环境 / 信号数据字典桥接层 (原 Interface.c 信号归宿)
-│       ├── rte_signal.h     # BSW <-> ASW 共享数据字典定义 (GbBSW_*, GsSPH_*, WLT_FAULT 结构体)
-│       ├── rte_signal.c     # 信号映射与状态打包函数 (如 FltFlag_Update() 逻辑)
-│       └── rte_interface.h  # 控制层访问 RTE 信号的 Getter / Setter 接口定义
+│   └── RTE/                 # 运行时环境 / 信号数据字典桥接层 (实现 ASW 与 BSW 解耦)
+│       ├── rte_signal.h     # 全局数据字典类型定义 (带 Validity/Quality 字段的物理量结构体)
+│       ├── rte_signal.c     # 信号读写互锁保护与更新逻辑 (含死区限制、限幅与状态标记)
+│       ├── rte_interface.h  # 控制层抽象访问接口 Getter / Setter API
+│       └── rte_interface.c
 │
-├── 06_APP/                  # [应用域 / ASW] 纯控制与业务算法层 (严格禁止包含任何 03_MCAL / 04_BSP 硬件头文件)
-│   ├── task_control.h       # 核心控制周期任务 (电机/算法/系统状态机)
+├── 06_APP/                  # [应用域 / ASW] 纯控制与业务算法层 (严格禁止引用任何 03/04 硬件头文件)
+│   ├── task_control.h       # 周期性核心控制算法 (1kHz/100Hz 确定性闭环控制逻辑)
 │   ├── task_control.c
-│   ├── task_ota.h           # OTA 业务状态机 (含 Safety Interlock 飞行/控制状态安全互锁)
-│   └── task_ota.c
+│   ├── task_ota.h           # OTA 业务控制状态机 (含 Safe Interlock 飞行/控制状态安全互锁)
+│   ├── task_ota.c
+│   ├── task_health.h        # 应用级健康状态汇报与降级逻辑
+│   └── task_health.c
 │
-├── 07_System/               # [系统与服务域] 系统初始化、中断路由、确定性安全监控
-│   ├── system_ch32v30x.h    # 时钟树配置头文件
-│   ├── system_ch32v30x.c    # SystemInit() 系统时钟配置
-│   ├── sys_isr.h            # 物理向量中断服务函数映射头文件
-│   ├── sys_isr.c            # 统一 C 语言 ISR 入口 (只做 Quick Ack 与 数据压入 BSP Buffer)
-│   ├── sys_health.h         # 适航级健康监控 (HM)、看门狗 Liveness 矩阵、Safe-State 切换
-│   ├── sys_health.c         # CPU Trap 捕获、NVRAM 异常日志记录
-│   ├── sys_atomic.h         # RISC-V 确定性临界区 (CSR / PFIC 中断开关) 保护抽象
-│   ├── sys_debug.h          # 条件编译诊断 Log / SYS_ASSERT (Release 状态彻底剥离)
+├── 07_System/               # [系统与服务域] 系统级服务、确定性调度与安全监控
+│   ├── system_ch32v30x.h    # 系统主时钟及总线时钟配置头文件
+│   ├── system_ch32v30x.c    # SystemInit() 配置 (含 HSE 锁定超时降级至 HSI 机制)
+│   ├── sys_isr.h            # 中断服务入口声明与优先级映射表
+│   ├── sys_isr.c            # 统一 C 中断入口 (仅执行快速 Ack 和硬件数据入队，无复杂逻辑)
+│   ├── sys_health.h         # DO-178C 适航级健康监控 (HM)、调度心跳矩阵监控、 Safe-State 切换
+│   ├── sys_health.c         # CPU Exception/Trap 捕获、NVRAM 故障日志持久化
+│   ├── sys_scheduler.h      # 确定性静态速率单调调度器 (Deterministic Static RMS Scheduler)
+│   ├── sys_scheduler.c
+│   ├── sys_atomic.h         # RISC-V 临界区保护 (全局中断开关与 Restore 机制，防止嵌套破环)
+│   ├── sys_debug.h          # 条件编译诊断工具 / 断言 SYS_ASSERT (RELEASE 构建彻底剔除)
 │   └── sys_debug.c
 │
-├── 08_Config/               # [配置域] 全局静态配置文件 (彻底切断依赖污染)
-│   ├── app_cfg.h            # 纯应用层配置 (任务周期、缓冲区大小，无任何 include)
-│   ├── board_cfg.h          # 板级物理引脚抽象映射 (仅使用标准 C 类型，严禁包含 MCAL 头文件)
-│   └── mcal_cfg.h           # 芯片外设库裁剪使能 (原 ch32v30x_conf.h，仅供 BSW/MCAL 使用)
+├── 08_Config/               # [配置域] 全局静态配置文件 (彻底切断层间头文件交叉依赖)
+│   ├── app_cfg.h            # 应用层参数宏 (任务执行周期、算法限制边界、缓冲区容量)
+│   ├── board_cfg.h          # 板级硬件物理引脚与映射抽象 (仅引用标准 C 类型，禁止包含 MCAL)
+│   ├── mcal_cfg.h           # MCAL 裁剪使能与参数映射 (仅供 BSW/MCAL 使用)
+│   └── rte_cfg.h            # RTE 信号池规模及范围约束配置
 │
-└── main.c                   # 系统总入口 (BSP 初始化 -> System Health 初始化 -> 启动主调度循环)
+└── main.c                   # 系统总入口 (系统硬件初始化 -> POST 自检 -> 启动确定性主调度循环)
 ```
 
 ---
